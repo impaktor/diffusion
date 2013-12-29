@@ -4,12 +4,12 @@
 #include <string>
 #include <vector>
 
-#include "nr/nr3.h"     //ran.h and ludcmp.h depends on this one.
-#include "nr/ran.h"     //Random number generator from numerical recipes 3 ed.
+#include "nr/nr3.h"     //ran.h and ludcmp.h depends on this one. 
+#include "nr/ran.h"     //Random number generator from numerical recipes 3 ed.  
 
 #include "auxiliary.h"   //non-physics stuff. (print messages etc.)
 #include "classes.h"    //various data structures /classes (Jump, Particle)
-#include "lattice.h"    //this is the main class, that does the physics. 
+#include "superInteraction.h"  //this is the main class, that does the physics.
 
 //BUG! LowMem 1: k_t 1, k_c 0.5, fix bound, 400^2, N=1, t_max 2000, E=1000, values=1000
 //MEN! den skriver ut perfekt output??!!
@@ -19,28 +19,12 @@
 // Or:  $ ssh -X nice -19 ./program output.dat < input.dat'
 
 //HARD-CODED VARIABLES:
-#define DISTRIBUTION     0          //0 = uniform, 1 = exponential,
-//                                    2 = power-law, 3 = nakazato     
-#define JUMPRATE_TRACER  0.5        //                                
-#define JUMPRATE_CROWDER 0.5        //(if nakazato-distribution)      
-#define FIXBOUNDARY      1          //1=fix wall, 0=periodic boundary 
-#define EXPONENTAIL_WAITING_TIME 0  
-
-/*
-Testar nu den nya v.6 med samplingTime istallet!
--LowMem on/off   Identical. 1% minne vid On, 50 % vid off!
-*/
-
-//-----------------------------------------------------------
-//now test my InteractionRoutine, with LowMem. (and without!):
-// at -i 2, c=0.7 k_t=0.25, LowMem = ON  Identical!
-// at -i 3, c=0.4 k_t=0.25, LowMem = OFF Identical!
-// at -i 2, c=0.5 k_t=0.25, LowMem = ON  Identical!
-
-//now test LowMem ON (and this new merged code) for interactions off
-// at k_t=0.5 c=0.5,         2Duniform,  Identical!
-// at k_t=0.5 c=0.5 -i 0 (!) 2Duniform,  Identical! (got warning about not using Nakazato)
-
+#define DISTRIBUTION     0    //0 = uniform, 1 = exponential,
+//                              2 = power-law, 3 = nakazato     
+#define JUMPRATE_TRACER  0.5  //                                
+#define JUMPRATE_CROWDER 0.5  //(if nakazato-distribution)      
+#define FIXBOUNDARY      0    //1 = fix wall, 0 = periodic boundary 
+#define EXPONENTAIL_WAITING_TIME 0 //                           
 
 
 //////////////////////////////////////
@@ -74,28 +58,25 @@ int main(int argc, char* argv[]){
 
   //TEST print result to screen:
   //-----------------------
-  string OnOff[]={"OFF","ON"};
-  int tempIndex=0;
-  if (InteractOn) tempIndex=1;
-  cout<<"###log = "<<logscale<<endl
-      <<"###interaction strength "<<OnOff[tempIndex]<<" ="<<InteractStr<<endl
-      <<"###filename = "<<(string) NameOfFile<<endl;
+  string OnOff[] = {"OFF","ON"};
+  int tempIndex = 0;
+  if (InteractOn) tempIndex = 1;
+  cout << "###log = " << logscale << endl
+       <<"###interaction strength " << OnOff[tempIndex] 
+       << " =" << InteractStr << endl
+       <<"###filename = " << (string) NameOfFile << endl;
   //-----------------------
 
-  if (fixBoundaryOn) 
-    cout <<"# Fix boundary"<<endl;  
-  else 
-    cout <<"# Periodic boundary"<<endl;
+  if (fixBoundaryOn)
+    cout << "# Fix boundary" << endl;  
+  else
+    cout << "# Periodic boundary" << endl;
 
   AskUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
 
-  Lattice crowd(X,Y,Z,N,fixBoundaryOn);
+  //initiate my class:
+  SuperInteraction crowd(X,Y,Z,N,fixBoundaryOn,InteractStr);
   
-  
-  if(InteractOn)                           //use Interaction algorithm
-    crowd.setInteraction(InteractStr);    //with "InteractStr" strength.
-
-
   //kanske ha den som invariabel i Save() istallet?
   //Set the switch true/false for use of low-mem run
   crowd.setLowMem(UseLowMem);
@@ -118,13 +99,13 @@ int main(int argc, char* argv[]){
 
       //Characteristic trait of the chosen distribution, 
       //just used to print info to file/screen
-      double Info=0;
+      double info = 0;
 
       float jumpTracer;
       
-      //NOTE: The jumprate is in EACH direction! Meaning, jumprate =1 
-      //is actually a jumprate =4 in 2D. (I think)
-      if (0 <= n && n<=3 && (u < 1 && u > 0) ){
+      //NOTE: The jumprate is in EACH direction! Meaning,
+      //jumprate =1 is actually a jumprate = 4 in 2D. (I think)
+      if (0 <= n && n <= 3 && (u < 1 && u > 0) ){
         jumpTracer = JUMPRATE_TRACER;  //Jumprate for the tracer paricle!
         float lambda = 1.0;            //used in option 1 Exp-dist.
         float y_c = 1.0;               //used in option 2 Power-law
@@ -134,27 +115,27 @@ int main(int argc, char* argv[]){
 
         switch(n){
         case 0:           
-          u = u;                    //ie. jumprate is uniform 
-          Info = 1.0;               //Maximum value for uniform random number
+          u = u;             //ie. jumprate is uniform (as I state in my thesis)
+          info = 1.0;        //Maximum value for uniform random number
           break;
         case 1: 
           u = (-log(u)) / lambda;
           u = 1.0/u;
-          Info = lambda;
+          info = lambda;
           break;
         case 2:
           //powerlaw, p(y) = alfa/y_c * (y/y_c)^{-1-alfa} if y > y_c, 0 otherwise
           u = y_c * pow(u,-1/alpha);  
           u=1.0/u;                   //convert friction coefficient to jump rate
-          Info = alpha;
+          info = alpha;
           break;
         case 3:
           if (particle == 0) u = jumpTracer;   //set juprate for the first
-          else u = jumpCrowders;               //set juprate for the rest
-          Info = jumpTracer/jumpCrowders;
+          else u = jumpCrowders;             //set juprate for the rest
+          info = jumpTracer/jumpCrowders;
           break;
         }
-        crowd.setDist(n,Info);
+        crowd.setDist(n,info);
       }
       else{
         if (n>3 || n <0 ) 
@@ -211,19 +192,8 @@ int main(int argc, char* argv[]){
   bool expWaitingTime = EXPONENTAIL_WAITING_TIME;
   crowd.setSamplingTimes(samplingTimes, expWaitingTime);
   
-
-  //====================
-  //When I use the inteeraction code, make sure I have Nakazato distribution
-  //with identical jumprates!
-  if ((InteractOn && DISTRIBUTION != 3) ||
-      (JUMPRATE_CROWDER != JUMPRATE_TRACER && DISTRIBUTION == 3 && InteractOn)){
-    cout << endl 
-         << "WARNING!! using interaction-code but not identical jumprates! \a"
-         << endl << endl;
-  }//====================
-
   //non-important nice-to-have simulation info.
-  RemainingTime printToScreen(ensemble);
+  RemainingTime printToScreen(ensemble);  
 
   for(int E = 0; E < ensemble; E++){
 
@@ -231,36 +201,16 @@ int main(int argc, char* argv[]){
                   
     crowd.place();
     
-    //(nymetod) ? crowd.move() : crowd.moveOld();
-    crowd.move(); //faster I would guess... (moveOld() is obsolete)
+    crowd.move();
 
     //make a print out of individual ensemble:
-    //crowd.dumpSimulation(E);
-    
-    // //TEST: to get a snapshot close to the MaxTime
-    // if(totalTime>=MaxTime-0.01){
-    //   crowd.Snapshot();
-    //   cout<<"totalTime:"<<totalTime<<endl;
-    // }
-
-
-    // TODO: ej uppdaterad efter min move()-implementering!
-    //  if(InteractOn){//INTERACTION
-    //     This is just to save the information of cluster-size distribution
-    //     crowd.saveCluster(totalTime);
-    // }//BUG Augusti, gar otroligt trogt med denna!
-    
+    //crowd.dumpSimulation(E);    
     
     //Store tracer position at each point for this ensemble, needed by
     //class to compute standard error/deviation. (+for binning, etc.)
     crowd.store(); 
     
   }
-
-  if(InteractOn){//INTERACTION
-    //crowd.saveBinning(ensemble);        //print a histogram of clusters 
-  }//BUG Augusti, gar otroligt trogt med denna!
-
 
   crowd.save(ensemble, NameOfFile);   // calculate std.dev. and save to file
 
@@ -284,15 +234,10 @@ int main(int argc, char* argv[]){
   -use __LINE__ to print line-number where error occured
   -use exceptions perhaps?
   -compare NRvector vs std::vector, for speed?
-  -suffix to dump matrix thingy.
-  -perhaps add the conditional number to the head of the out-file.
+  
 */
 
-//There are various testing functions in here, but they are either silenced by
-//use of if-statements in combination with a boolean "test" variable set to 
-//false, or just commented out. A lot of work went into testing the output, 
-//therefore some things can seem redundant, such as printing un-squared
-//displacements (<dx>~0) etc. 
+//There are various testing functions in here, but they are either silenced by use of if-statements in combination with a boolean "test" variable set to false, or just commented out. A lot of work went into testing the output, therefore some things can seem redundant, such as printing un-squared displacements (<dx>~0) etc. 
 
 
 /*
@@ -319,3 +264,5 @@ int main(int argc, char* argv[]){
  [make the actual move]     [make the actual move]
 
 */
+
+

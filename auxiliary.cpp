@@ -4,11 +4,15 @@
 #include <vector>
 #include <string>
 
-#include "auxilary.h"
-
+#include "auxiliary.h"
 
 using namespace std;
 
+
+//Read in specifications from command flags, return value through references.
+//See: http://www.gnu.org/software/libc/manual/html_node/Getopt.html
+//for information on the getopt()-function, which is what this entire 
+//function uses.
 void argumentFlags(int argc, char** argv, bool& logarithm, bool& low_mem,
                    bool& interactionON, bool& quiet, int& interaction_strength, 
                    char ReturnFileName[]){
@@ -74,7 +78,7 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& low_mem,
     exit(1);
   }
 
-  //if non of the above specified arguments were passed:
+  //if none of the above specified arguments were passed:
   //take the first as new file_name, and print the rest as 
   //errors
   int index;
@@ -125,9 +129,11 @@ T getNonCommentInput(void){
   return (T) atof(invalue);
 }
 
+//(return simulation parameters through reference)
 void AskUserForInputParameters(int& xdim, int& ydim, int& zdim,
                                int& particleNumber, int& ensembles, 
                                int& number_of_values, double& stopTime){
+
   cout <<"# Specify number of lattice sites in:"<<endl;
   cout <<"# X: ";
   xdim = getNonCommentInput<int>(); //ignore lines containing '#'
@@ -162,6 +168,7 @@ void printHelp(char* File, char** argv){
     cout<<"-l \t Set log-spacing between data values to be written to\n\t output-file to ON."<<endl;
     cout<<"-w NAME\t Set output-file to 'NAME'."<<endl;
     cout<<"NAME\t Set first non-valid options-flag as name of output-file.\n (shorter/faster version than using the '-w' option)"<<endl;
+    cout<<"-q\t Set \"quiet mode\"=true. I.e print less information to the screen."<<endl;
 
     cout<<endl<<"Arguments can be given in any order. If no flags are set the first argument following \""<<argv[0]<<"\" will be taken as the output-file name. With no arguments given the default is log-spacing of values to output-file \""<<default_file_name<<"\" without any interactions at all. Note, with '-i 0' the interaction strength will be 0, but the interaction code will be turned ON, resulting in a slower simulation run, therefore the default circumvents the interaction calculations entirely."<<endl<<endl;
 
@@ -226,12 +233,12 @@ int main ( int argc, char *argv[] )
   double density = Density();
   double D_eff=DiffEffConstant();
   double D_naka=Nakazato();
-  double ergo = Ergodicity(RutorX,RutorY,RutorZ);
+  double ergo = Ergodicity(latticeX_,latticeY_,latticeZ_);
 
   plot.open(name);
   //Lite information:
   plot <<"# E = "<<ensemble<<"\t N = "<<N<<"\t X-Y-Z: "
-  <<RutorX<<"x"<<RutorY<<"x"<<RutorZ<<"\t concentration="<<density<<endl;
+  <<latticeX_<<"x"<<latticeY_<<"x"<<latticeZ_<<"\t concentration="<<density<<endl;
   //TODO: skriv ut vilken fördelning det är på jumprates...
 
   if (writeToFile){
@@ -291,19 +298,19 @@ int main ( int argc, char *argv[] )
 
 
 void printError(string message){
-  cout << message << endl;
+  cout <<"\n Error: " << message << endl;
   abort();
 }
 
 //use __FILE__ and __LINE__ macro to get line and filename;
 void printError(string message, int line){
-  cout <<"Error occured at line: " << line
+  cout <<"\n Error occured at line: " << line
        << endl << message << endl;
   abort();
 }
 
 void printError(string message, string file, int line){
-  cout <<"Error occured in file " << file << " at line: " << line
+  cout <<"\n Error occured in file " << file << " at line: " << line
        << endl << message << endl;
   abort();
 }

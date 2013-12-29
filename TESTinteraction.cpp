@@ -4,8 +4,8 @@
 #include <ctime>           //för att använda systime som seed
 #include <vector>          //för vektorklassen
 #include <cmath>           //för pow-, sqrt-funktionerna
-#include "nr3.h"           //Random number generator from nummerical recipes 3 ed.
-#include "ran.h"           //obs, inkludera inte denna vid g++-kompileringen
+#include "nr/nr3.h"        //Random number generator from nummerical recipes 3 ed.
+#include "nr/ran.h"        //obs, inkludera inte denna vid g++-kompileringen
 
 //Main-function usage: ./program [outputN.dat] [0/1]
 //where the two arguments are optional. The default is to produce an output to "out.dat", with values with linear spacing (logscale off =0). If you want logscale=ON, but still use default "out.dat", you must still specify it: ./program out.dat 1. 
@@ -14,14 +14,14 @@
 // $ ssh -n 'cd /to/path; nice -19 ./program <input.dat > output1.dat'
 
 //some hardcoded stuff:
-#define INTERACTION_ENERGY 0    //Interaction energy, > 0 ! (must be non-negative)
-#define VERBOSE 1               //print detailed information about SuperInteraction()
+#define INTERACTION_ENERGY 45    //Interaction energy, > 0 ! (must be non-negative)
+#define VERBOSE 0               //print detailed information about SuperInteraction()
 #define CHECK_VACANCY_ON 0      //turn on/off the time-consuming CheckVacancyMatrix()
 
 #define DISTRIBUTION     0    //0=uniform, 1=exponential,         | (main)
 //                              2=power-law, 3=nakazato           | (main)
-#define JUMPRATE_TRACER  1.0    //                                  | (main)
-#define JUMPRATE_CROWDER 1.0  //(if nakazato-distribution)        | (main)
+#define JUMPRATE_TRACER  0.5    //                                  | (main)
+#define JUMPRATE_CROWDER 0.5  //(if nakazato-distribution)        | (main)
 #define FIXBOUNDARY      0    //1=fix wall, 0=periodic boundary   | (main ->class)
 
 using namespace std;
@@ -1989,7 +1989,7 @@ int main(int argc, char* argv[]){
         float lambda=1.0;                    //used in option 1 Exp-dist.
         float y_c = 1.0;                     //used in option 2 Power-law
         float alpha=1.0;                     //used in option 2 Power-law
-        float gamma_white = JUMPRATE_TRACER; //used in option 3 Nakazato
+        float gamma_white = JUMPRATE_CROWDER;//used in option 3 Nakazato
         crowd.set_gamma(gamma_white, gamma_black); 
 
         switch(n){

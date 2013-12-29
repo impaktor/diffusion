@@ -1,29 +1,31 @@
 CC = g++
 
-#The -c flag makes .o files, that will speed up future 
+#The -c flag makes .o files, that will speed up future
 #compilations in multi-source projects
 CFLAGS = -c -O3
 
 LDFLAGS = -Wall -pedantic
-DEBUG = -g 
-SOURCES = prog.cpp classes.cpp auxilary.cpp
+DEBUG = -g
+SOURCES = prog.cpp lattice.cpp classes.cpp auxiliary.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 EXECUTABLE = prog
 
-ALL_FILES = prog.cpp classes.h classes.cpp \
-auxilary.cpp auxilary.h Makefile ran.h nr3.h ludcmp.h README.txt
-MY_HEADERS = classes.h auxilary.h 
+ALL_FILES = prog.cpp lattice.cpp lattice.h classes.h classes.cpp \
+auxiliary.cpp auxiliary.h Makefile nr/* README.txt TESTinteraction.cpp $(SUPER)
+MY_HEADERS = classes.h auxiliary.h lattice.h
 
-all: $(SOURCES) $(EXECUTABLE)
+#These files are only included for easy tar.gz/zip-ing:
+SUPER = superInteraction.cpp superInteraction.h superProg.cpp make.super
 
-$(EXECUTABLE): $(OBJECTS) 
+$(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
 
+all: $(SOURCES) $(EXECUTABLE)
 
-clean:     
+clean:
 	\rm -v *.o *~
 
 debug:
@@ -39,10 +41,13 @@ lines:
 	wc -l $(SOURCES) $(MY_HEADERS)
 
 simple:
-	g++ -O2 prog.cpp classes.cpp auxilary.cpp -o prog
+	g++ -O2 prog.cpp classes.cpp auxiliary.cpp -o prog
 
 tags:
 	etags $(SOURCES)
+
+super:
+	make -f make.super
 
 
 # ETAGS = etags
