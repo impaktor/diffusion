@@ -45,35 +45,32 @@ using namespace std;
 class Partiklar {
   vector<Particle> pos;                    //XYZ-position for each particle on the lattice
   Particle pos_0;                          //Initial position for the tagged particle
+  int nParticles_;                         //Total number of particles
+  int latticeX_, latticeY_, latticeZ_;     //Lattice size
 
   vector<long double> x2_err,y2_err,z2_err,r2_err; //Store std error, in each point
   vector<double> x2_mu,y2_mu,z2_mu,r2_mu;  //average of displacement squared: <X^2>,... 
   vector<double> x_mu, y_mu, z_mu, r_mu;   //average of displacement: <X>, <Y>...
   vector<double> t;                        //store the time to be matched to the stored pos.
 
-  vector<double> jmpRateXright,jmpRateXleft,jmpRateYright,
-    jmpRateYleft,jmpRateZup,jmpRateZdown;  //jump-rate for each particle and direction
+  vector<Jump> jumpRate_;                   //jump-rate for each particle and direction
   vector <long double> partialSum_;        //cumulative sum of jump-rates
 
-  int latticeX_, latticeY_, latticeZ_;     //Lattice size
-  int nParticles_;                         //Total number of particles
   int dim_;                                //dimension of lattice (=1 || 2 || 3)
   bool boundaryFix_;                       //"true" if fix, "false" if periodic
   float concentration_;                    //particle concentration
   double timeSum_;                         //Sum of time for each move
 
   //TODO------------
-  //var tidigare dx, dy,dz och double dr!
   //vector< vector<Particle> > msdTracer;    //pos. of tracer particle. needed for stdrerr
-
   vector< vector<int> > dx,dy,dz;            //pos. of tracer particle. needed for stdrerr
   vector< vector<double> > dr;               //pos. of tracer particle. needed for stdrerr
-
   //------------
 
   int convertMuToParticle(int, int&);
   void computePartialSum(void);
   void moveAndBoundaryCheck(int,int);
+
   int vacancyCheckOld(int, Particle);     //No double Occupancy.
   int vacancyCheck(int, Particle);        //Same as above, but improved. Use this one instead.
   vector<vector<vector<int> > > vacancy_; //Needed in my more efficient "vacancyCheck()"
@@ -126,11 +123,8 @@ public:
   void set_interaction(float);             //determine if we use the interaction-algorithm
   void set_LowMem(bool, int);              //Set the switch true/false for use of low-mem run
 
-  //Set jump-rate of each particle and direction, depending on if dim=1,2,3. 
-  void setJumpRate(vector<double>&, vector<double>&, vector<double>&,
-                   vector<double>&, vector<double>&, vector<double>&);
-  void setJumpRate(vector<double>&, vector<double>&, vector<double>&, vector<double>&);
-  void setJumpRate(vector<double>&, vector<double>&);
+  //Set jump-rate of each particle and direction 
+  void setJumpRate(vector<Jump>);
 
   //Secondary not used functions
   void snapshot(void);                     //Not used. (more comments in function body)
@@ -446,7 +440,7 @@ void Partiklar::snapshot(void){
   matris.assign(latticeX_,temp);
 
   for(int i=0; i < nParticles_; i++){
-    matris[ pos[i].x-1 ][ pos[i].y-1 ] = jmpRateXright[i];
+    matris[ pos[i].x-1 ][ pos[i].y-1 ] = jumpRate_[i].x.r; //TODO BUG!
   }
 
   ofstream heat;
@@ -457,7 +451,7 @@ void Partiklar::snapshot(void){
   if(points){
     //This does not give 0 where there are no particles:
     for (int i=0; i < nParticles_; i++)
-      heat  << pos[i].x<<" \t"<< pos[i].y <<"\t"<< jmpRateXright[i]<< endl;
+      heat  << pos[i].x<<" \t"<< pos[i].y <<"\t"<< jumpRate_[i].x.r<< endl; //TODO BUG
   }
   else{
     //This gives zeroes for all empty sites:
@@ -600,10 +594,13 @@ Partiklar::Partiklar(int xSquare,int ySquare,int zSquare,
       pos_0.y = round(1.0*latticeY_/2); 
       pos_0.z = round(1.0*latticeZ_/2); 
       
+      //TODO: what if Z = 0
       concentration_=(float) nParticles_ / (latticeX_ * latticeY_ * latticeZ_); 
 
       //Hardcoded Switches:
-      testOnOff_=TEST_1;           //boolean, for print details to screen. 
+      //------------------
+      //boolean, for print details to screen. 
+      testOnOff_=TEST_1;
 
       //Define the dimention of the lattice
       if (latticeY_<=1 && latticeZ_<=1) dim_ = 1; 
@@ -1318,7 +1315,7 @@ void Partiklar::save(int Ensemble, char name[]){
         << "\t distr: "<<dist[distribution_]<<" ("<<info_
         << ")\t bound: "<<bound[boundaryFix_]<<endl;
   print << "#D_eff: "<<d_eff<<"\t k_tagg: "
-        << jmpRateXright[0]<<"\t D_av: "<<d_av
+        << jumpRate_[0].x.r<<"\t D_av: "<<d_av
         << "\t Interaction: "<<onOff[interactionOn_]<<" "
         << interactionStrength_<<endl; 
   
@@ -1500,7 +1497,7 @@ int main(int argc, char* argv[]){
   crowd.set_LowMem(UseLowMem, antal_punkter);
 
   static Ran tempnumb(17);                 //just anny seed will do
-  vector<double> jXr, jYr, jZu, jXl, jYl, jZd; 
+  vector<Jump> hopRate;
   if (nymetod){
     for (int particle = 0; particle < N; particle ++){
       double u;
@@ -1567,26 +1564,24 @@ int main(int argc, char* argv[]){
       //Manually set the jumprate of the tracer particle (first one)
       if (particle == 0 ) u = jumpTracer;
       
-      jXr.push_back(u);
-      jXl.push_back(u);
-      jYr.push_back(u);
-      jYl.push_back(u);
-      jZu.push_back(u);
-      jZd.push_back(u); 
+      //save jump rate u to right and left direction
+      Direction dir(u,u);
+      
+      Jump jump;
 
+      //same jumprate in all dimensions (x,y,z)
+      jump.x = dir;
+      jump.y = dir;
+      jump.z = dir;
+
+      hopRate.push_back(jump);
     }
   }
 
-  
-  //jumprate -START-------------------
+  //if using jump rates (i.e. not moveOld()-function)
   if (nymetod){
-    //Sätter jumprate enl. tilldelat ovan:
-    int dimension = crowd.getDimension();
-    if (dimension == 1)  crowd.setJumpRate(jXr, jXl);                  
-    if (dimension == 2)  crowd.setJumpRate(jXr, jXl, jYr, jYl);        
-    if (dimension == 3)  crowd.setJumpRate(jXr, jXl, jYr, jYl, jZu, jZd); 
+    crowd.setJumpRate(hopRate);
   }
-  //jumprate -END-------------------
 
 
   //double dt = crowd.get_dt();  //Only used this when I used my heatmap-function
@@ -1694,37 +1689,17 @@ int main(int argc, char* argv[]){
 //         N Y  K O D           //
 //////////////////////////////////
 
-//---------------------------------------------------------------------------
-// Överlagrad set-jumprate-funktion
-//---------------------------------------------------------------------------
-void Partiklar::setJumpRate(vector<double>& setJmpXright, vector<double>& setJmpXleft,
-                            vector<double>& setJmpYright, vector<double>& setJmpYleft, 
-                            vector<double>& setJmpZup,    vector<double>& setJmpZdown){
-  if (dim_!=3){
-    cout <<"Error: The number of jump rate-directions and dimension"
-         <<endl<< "of lattice does not correspond"<<endl;
-    abort();
-  }
 
-  if (setJmpXright.size() == nParticles_ && setJmpXleft.size() == nParticles_ &&
-      setJmpYright.size() == nParticles_ && setJmpYleft.size() == nParticles_ &&
-      setJmpZup.size() == nParticles_    && setJmpZdown.size() == nParticles_){
+void Partiklar::setJumpRate(vector<Jump> jumpRate){
+  if (jumpRate.size() == nParticles_){
 
-    jmpRateXright.clear();  // remove jumprates from previous runs 
-    jmpRateXleft.clear();
-    jmpRateYright.clear();
-    jmpRateYleft.clear();
-    jmpRateZup.clear();
-    jmpRateZdown.clear();
-    
-    jmpRateXright = setJmpXright;
-    jmpRateXleft  = setJmpXleft;
-    jmpRateYright = setJmpYright;
-    jmpRateYleft  = setJmpYleft;
-    jmpRateZup    = setJmpZup;
-    jmpRateZdown  = setJmpZdown;
+    // remove jumprates from previous runs 
+    // but now we are quenched so not needed (I think) TODO (is this right?)
+    jumpRate_.clear();
+    jumpRate_ = jumpRate;
 
-    computePartialSum();         //Use these vectors to build the partial sum
+    //Use these vectors to build the partial sum
+    computePartialSum();         
 
   }
   else{
@@ -1735,68 +1710,9 @@ void Partiklar::setJumpRate(vector<double>& setJmpXright, vector<double>& setJmp
   }
 }
 
-//in 2D:
-void Partiklar::setJumpRate(vector<double>& setJmpXright, vector<double>& setJmpXleft,
-                            vector<double>& setJmpYright,vector<double>& setJmpYleft){
-  if (dim_!=2){
-    cout <<"Error: The number of jump rate-directions and dimension"
-         <<endl<< "of lattice does not correspond"<<endl;
-    abort();
-  }
-
-  if (setJmpXright.size() == nParticles_ && setJmpXleft.size() == nParticles_ &&
-      setJmpYright.size() == nParticles_ && setJmpYleft.size() == nParticles_){
-
-    jmpRateXright.clear();  // remove jumprates from previous runs 
-    jmpRateXleft.clear();
-    jmpRateYright.clear();
-    jmpRateYleft.clear();
-    
-    jmpRateXright = setJmpXright;
-    jmpRateXleft  = setJmpXleft;
-    jmpRateYright = setJmpYright;
-    jmpRateYleft  = setJmpYleft;
-
-    computePartialSum();         //Use these vectors to build the partial sum  
-
-  }
-  else{
-    cout <<"Error, number of jumprates must equal number of particles"
-         <<endl;
-    abort();
-  }
-}
-
-//in 1D
-void Partiklar::setJumpRate(vector<double>& setJmpXright, 
-                            vector<double>& setJmpXleft){
-  if (dim_!=1){
-        cout <<"Error: The number of jump rate-directions and dimension"
-         <<endl<< "of lattice does not correspond"<<endl;
-    abort();
-  } 
-  
-  if (setJmpXright.size()==nParticles_ && setJmpXleft.size()==nParticles_){
-    
-    jmpRateXright.clear();  // remove jumprates from previous runs 
-    jmpRateXleft.clear();
-    
-    jmpRateXright = setJmpXright;
-    jmpRateXleft  = setJmpXleft;
-    
-    computePartialSum();         //Use these vectors to build the partial sum
-  }
-  else{
-    cout <<"Error, number of jumprates must equal number of particles"
-         <<endl;
-    abort();
-  }
-}
-//--------------------------------------------------------------------------
-//--------------------------------------------------------------------------
 
 void Partiklar::computePartialSum(){
-  long double tmp=0;
+  long double tmp = 0;
   int i;
 
   // delete previous run
@@ -1805,43 +1721,38 @@ void Partiklar::computePartialSum(){
   // first element must be zero
   partialSum_.push_back(tmp);
                                
-
   //check the jump-rate-vectors  
-  if ( jmpRateXright.size()!=nParticles_ || jmpRateXleft.size()!=nParticles_ )
-    printError("Error in X, number of jumprates != N");
-  if ( (jmpRateYright.size()!=nParticles_ || jmpRateYleft.size()!=nParticles_) && dim_>1)
-    printError("Error in Y, number of jumprates != N");
-  if ( (jmpRateZup.size()!=nParticles_ || jmpRateZdown.size()!=nParticles_) && dim_==3)
-    printError("Error in Z, number of jumprates != N");
+  if ( jumpRate_.size()!=nParticles_ )
+    printError("Error in number of jumprates, != N");
   
   //build partialSum-vector
   if(dim_>=1){
     for(i=0; i < nParticles_ ; i++){
-      tmp = tmp+jmpRateXright[i];
+      tmp = tmp + jumpRate_[i].x.r;
       partialSum_.push_back(tmp);  //index 1 ... N
     }
     for (i=0; i < nParticles_ ; i++){ 
-      tmp = tmp+jmpRateXleft[i];
+      tmp = tmp + jumpRate_[i].x.l;
       partialSum_.push_back(tmp);  //index N+1 ... 2N
     }
   }
   if (dim_ >=2 ){
     for (i=0; i < nParticles_; i++ ){
-      tmp = tmp+jmpRateYright[i];
+      tmp = tmp+jumpRate_[i].y.r;
       partialSum_.push_back(tmp);   //index 2N+1 ... 3N
     }
     for (i=0; i < nParticles_; i++ ){
-      tmp = tmp+jmpRateYleft[i];
+      tmp = tmp+jumpRate_[i].y.l;
       partialSum_.push_back(tmp);   //index 3N+1 ... 4N
     }
   }
   if(dim_==3){
     for (i=0; i < nParticles_; i++ ){
-      tmp = tmp+jmpRateZup[i];
+      tmp = tmp+jumpRate_[i].z.r;
       partialSum_.push_back(tmp);   //index 4N+1 ... 5N
     }
     for (i=0; i < nParticles_; i++ ){
-      tmp = tmp+jmpRateZdown[i];
+      tmp = tmp+jumpRate_[i].z.l;
       partialSum_.push_back(tmp);   //index 5N+1 ... 6N
     }
   }
@@ -1914,23 +1825,23 @@ double Partiklar::diffEffConstant(void){
     double sum_temp=0;
   
     if (dim_ >= 1){
-      for (int i=0; i < jmpRateXright.size(); i++){
-        sum_temp = sum_temp + 1.0/jmpRateXright[i];
-        sum_temp = sum_temp + 1.0/jmpRateXleft[i];
+      for (int i=0; i < nParticles_; i++){
+        sum_temp = sum_temp + 1.0/jumpRate_[i].x.l;
+        sum_temp = sum_temp + 1.0/jumpRate_[i].x.l;
       }
     }
 
     if (dim_>=2){
-      for (int i=0; i < jmpRateYright.size(); i++){
-        sum_temp = sum_temp + 1.0/jmpRateYright[i];
-        sum_temp = sum_temp + 1.0/jmpRateYleft[i];
+      for (int i=0; i < nParticles_; i++){
+        sum_temp = sum_temp + 1.0/jumpRate_[i].y.r;
+        sum_temp = sum_temp + 1.0/jumpRate_[i].y.l;
       }
     }
 
     if (dim_==3){
-      for (int i=0; i < jmpRateZup.size(); i++){
-        sum_temp = sum_temp + 1.0/jmpRateZup[i];
-        sum_temp = sum_temp + 1.0/jmpRateZdown[i];
+      for (int i=0; i < nParticles_; i++){
+        sum_temp = sum_temp + 1.0/jumpRate_[i].z.r;
+        sum_temp = sum_temp + 1.0/jumpRate_[i].z.l;
       }
     }
 
@@ -1939,20 +1850,20 @@ double Partiklar::diffEffConstant(void){
 
     //Calculate Average as well:
     D_av_=0;
-    for (int i=0; i < jmpRateXright.size(); i++){
-      D_av_ = D_av_ + jmpRateXright[i];
-      D_av_ = D_av_ + jmpRateXleft[i];
+    for (int i=0; i < nParticles_; i++){
+      D_av_ = D_av_ + jumpRate_[i].x.r;
+      D_av_ = D_av_ + jumpRate_[i].x.l;
     }
     if(dim_ > 1){
-      for (int i=0; i < jmpRateYright.size(); i++){
-        D_av_ = D_av_ + jmpRateYright[i];
-        D_av_ = D_av_ + jmpRateYleft[i];
+      for (int i=0; i < nParticles_; i++){
+        D_av_ = D_av_ + jumpRate_[i].y.r;
+        D_av_ = D_av_ + jumpRate_[i].y.l;
       }
     }
     if (dim_>2){
-      for (int i=0; i < jmpRateZup.size(); i++){
-        D_av_ = D_av_ + jmpRateZup[i];
-        D_av_ = D_av_ + jmpRateZdown[i];
+      for (int i=0; i < nParticles_; i++){
+        D_av_ = D_av_ + jumpRate_[i].z.r;
+        D_av_ = D_av_ + jumpRate_[i].z.l;
       }
     }
     D_av_ = D_av_ * 1.0/(nParticles_ * 2 * dim_);
@@ -1990,7 +1901,6 @@ double Partiklar::diffEffConstant(void){
   -kanske ha en MSD-klass, double x y z r?
   -ta bort dx dy dz dr.
   -kompilera med -Wall -pedantic
-  -infor jump-klass!
 */
 
 //There are various testing functions in here, but they are either silenced by use of if-statements in combination with a boolean "test" variable set to false, or just commented out. A lot of work went into testing the output, therefore some things can seem redundant, such as printing un-squared displacements (<dx>~0) etc. 
