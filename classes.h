@@ -19,12 +19,19 @@ public:
 
 class Jump{
 public:
-  Jump(double right,double left);
-  Jump(void){};
+  Jump;
+  Direction x;
+  Direction y;
+  Direction z;
+};
+
+class Direction{
+public:
+  Direction(double right,double left);
+  Direction(void){};
   double r;  //right
   double l;  //left
 };
-
 
 class Particle{
 public:
@@ -42,6 +49,7 @@ public:
   //This allows us to print x,y,z with the << operator
   //like: Particle particle(1,4,2);  cout << particle <<endl; 
   friend std::ostream& operator<< (std::ostream &out, Particle &particle); 
+  friend std::istream& operator>> (std::istream &in, Particle &particle); 
 
 };
 

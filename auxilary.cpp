@@ -1,33 +1,25 @@
-#include <sstream>         //behövs kanske för "ostringstream" i save()-func.
-#include <string>          //behövs kanske inte?
 #include <iostream>        //for cout, among others
-#include <fstream>         //read write to files
 #include <cstdlib>         //for abort()-function
-#include <vector>          //for the vector class
-#include <cmath>           //gives us sqrt, pow, fabs, 
+#include <cstring>         //strcpy, strchr 
+#include <vector>
+#include <string>
 
-// #include <algorithm>       //needed for min_element in hist/bin-function
-// #include <stdio.h>
+#include "auxilary.h"
 
-void printHelp(char*, char**);
-void argumentFlags(int, char**, bool&, bool&, bool&, int&, char[]);
-void AskUserForInputParameters(int&, int&, int&, int&, int&, int&, double&);
-int getNonCommentIntInput(void);
-double getNonCommentDoubInput(void);
 
 using namespace std;
 
 void argumentFlags(int argc, char** argv, bool& logarithm, bool& interactionON,
                    bool& quiet, int& interaction_strength, char ReturnFileName[]){
   
-  char* file_name=ReturnFileName;
-  char* default_file_name=file_name;
+  char* file_name = ReturnFileName;
+  char* default_file_name = file_name;
 
-  bool changed_file_name=false;
-  bool error=false;
+  bool changed_file_name = false;
+  bool error = false;
 
   //TODO: flytta in som arg.
-  bool low_mem=false;
+  bool low_mem = false;
 
   int c;
   opterr=0;
@@ -123,27 +115,25 @@ void AskUserForInputParameters(int& xdim, int& ydim, int& zdim,
                                int& number_of_values, double& stopTime){
   cout <<"# Specify number of lattice sites in:"<<endl;
   cout <<"# X: ";
-  xdim= getNonCommentIntInput(); //ignore lines containing '#'
+  xdim = getNonCommentIntInput(); //ignore lines containing '#'
   cout<<"# Y: ";
-  ydim= getNonCommentIntInput(); //ignore lines containing '#'
+  ydim = getNonCommentIntInput(); //ignore lines containing '#'
   cout<<"# Z: ";
-  zdim= getNonCommentIntInput(); //ignore lines containing '#'
+  zdim = getNonCommentIntInput(); //ignore lines containing '#'
 
   cout <<"# Total number of particles: ";
-  particleNumber=getNonCommentIntInput();
+  particleNumber = getNonCommentIntInput();
 
-  float info= 1.0*(xdim*ydim*zdim)/particleNumber;
+  float info = 1.0*(xdim*ydim*zdim)/particleNumber;
  
   cout <<"# Number of vacant sites/particle: "<<info<<endl;
   cout <<"# Number of ensembles: ";
-  ensembles=getNonCommentIntInput();
+  ensembles = getNonCommentIntInput();
   cout <<"# Number of data-values to save: ";
   number_of_values=getNonCommentIntInput();
   cout <<"# Stop-time: ";
-  stopTime=getNonCommentDoubInput();
-  cout << endl;
-  
-  cout <<"--------------------------------"<<endl;
+  stopTime = getNonCommentDoubInput();
+  cout << endl<<endl;
   
 }
 
@@ -182,46 +172,37 @@ void printHelp(char* File, char** argv){
 
 }
 
+//====================================================================
+/*#include <fstream>
+#include <iostream>
 
+using namespace std;
 
-  /* This is the old argument-taking code used in main(), now
-     replaced by "argumentFlags()"
-
-  char* NameOfFiles;
-  char DefaultNameOfFile[]="out.dat";
-  NameOfFiles=DefaultNameOfFile;
-
-  if (argc>=2){
-    NameOfFiles=argv[1];  //manually set the output-filename
-    cout<<"Output-file changed to: "<<NameOfFiles<<endl;
-  }  
-
-  if (argc>=3){           //if the second arg=1 -> logscale=on
-    int SecondArg = atoi(argv[2]);
-    if (SecondArg==1 || SecondArg==0){
-      logscale = SecondArg;
-      cout <<"Logscale: "<<SecondArg<<endl;
+int main ( int argc, char *argv[] )
+{
+  if ( argc != 2 ) // argc should be 2 for correct execution
+    // We print argv[0] assuming it is the program name
+    cout<<"usage: "<< argv[0] <<" <filename>\n";
+  else {
+    // We assume argv[1] is a filename to open
+    ifstream the_file ( argv[1] );
+    // Always check to see if file opening succeeded
+    if ( !the_file.is_open() )
+      cout<<"Could not open file\n";
+    else {
+      char x;
+      // the_file.get ( x ) returns false if the end of the file
+      //  is reached or an error occurs
+      while ( the_file.get ( x ) )
+        cout<< x;
     }
-    else cout <<SecondArg<<
-           " is wrong, must be: 0=logscale OFF, or 1=logscale ON"<<endl;
+    // the_file is closed implicitly here
   }
-
-  if (argc>=4){           //if the third arg=1 -> rescale=on
-    int ThirdArg = atoi(argv[3]);
-    if (ThirdArg==1 || ThirdArg==0){
-      rescale = ThirdArg;
-      cout <<"Rescale: "<<ThirdArg<<endl;
-    }
-    else cout <<ThirdArg<<
-           " is wrong, must be: 0=normal Time, or 1=rescale ON"<<endl;
-  }
-  */
+}
 
 
-
-
-
-//==========================================================================
+*/
+//====================================================================
 
 /*
   void printGnuplot(char name[], int ToGnuPlot, int ensemble, int distribution){
@@ -324,5 +305,11 @@ double getNonCommentDoubInput(void){
   }
 
   return atof(invalue);
+}
+
+
+void printError(string message){
+  cout << message << endl;
+  abort();
 }
 

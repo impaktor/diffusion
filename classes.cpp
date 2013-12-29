@@ -18,13 +18,25 @@ Particle::Particle(int X, int Y, int Z){
 Jump::Jump(double right, double left){
     r = right;
     l = left;
-};
+}
 
 //overloading the << operator for the Particle class.
+//Taken from http://www.learncpp.com/cpp-tutorial/
 std::ostream& operator<< (std::ostream &out, Particle &particle){
   out << particle.x <<", " << particle.y <<", " << particle.z;
   return out;
 }
+
+//overloading the >> operator for the Particle class.
+//Note: don't actually use this, just for the sake of completeness: 
+std::istream& operator<< (std::istream &in, Particle &particle){
+  //usage: Entering "54 67 42" will store to the class object. 
+  in >> particle.x;
+  in >> particle.y;
+  in >> particle.z;
+  return in;
+}
+
 
 //constructor
 RemainingTime::RemainingTime(unsigned int totalEnsembles){
