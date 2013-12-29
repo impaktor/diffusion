@@ -1,60 +1,77 @@
-CC = g++
-CFLAGS = -c $(OPTFLAGS)
-LFLAGS = -Wall -pedantic $(OPTFLAGS)
-DEBUG = -g
-OPTFLAGS = -O2
 EXECUTABLE = prog
+CC   = g++
 
-BASIC_SOURCES = lattice.cpp classes.cpp auxiliary.cpp save.cpp
-SUPER = superInteraction.cpp superInteraction.h main_super.cpp
-SOURCES = $(BASIC_SOURCES) main.cpp
-OBJECTS = $(SOURCES:.cpp=.o)
-SOURCES2 = $(BASIC_SOURCES) main_thread.cpp
-OBJECTS2 = $(SOURCES2:.cpp=.o)
-MY_HEADERS = classes.h auxiliary.h lattice.h save.h
-ALL_FILES = $(SOURCES) $(MY_HEADERS) $(SUPER) nr/* Makefile README.txt main_thread.cpp
+override CFLAGS := -c -pedantic -Wall -Wno-switch $(CFLAGS)
 
+LIBS =
+LDFLAGS =
+#LDFLAGS = $(LIBS) -pg -fprofile-arcs -ftest-coverage
+# -L/usr/local/lib
+
+###SLOW: -O0 = no optimization, -g3 compile debug info, std = use new c++ standard
+#======================================================================
+FLAGS = $(CFLAGS) -O0 -g3 -std=c++0x
+
+###FAST: -O2 = optimize, use new standard, NDEBUG = NoDebug, disables asserts()
+#======================================================================
+#FLAGS = $(CFLAGS) -O2 -std=c++0x -D NDEBUG
+
+########################### END #######################################
+
+MY_HEADERS = classes.h auxiliary.h lattice.h save.h superInteraction.h global.h
+
+SOURCES_BASIC  = lattice.cpp classes.cpp auxiliary.cpp save.cpp
+SOURCES_SUPER  = superInteraction.cpp main_super.cpp
+SOURCES_THREAD = main_thread.cpp
+SOURCES_MAIN   = main.cpp
+
+OBJECTS_BASIC  = $(SOURCES_BASIC:.cpp=.o)
+OBJECTS_SUPER  = $(SOURCES_SUPER:.cpp=.o)
+OBJECTS_THREAD = $(SOURCES_THREAD:.cpp=.o)
+OBJECTS_MAIN   = $(SOURCES_MAIN:.cpp=.o)
+
+ALL_FILES = $(SOURCES_SUPER) $(SOURCES_THREAD) $(SOURCES_MAIN) $(SOURCES_BASIC) $(MY_HEADERS) nr/* Makefile README.txt input.dat
 
 all: $(EXECUTABLE)
 
-thread: $(OBJECTS2)
-	$(CC) $(LFLAGS) -lboost_thread $(OBJECTS2) -o prog_thread
+.cpp.o:
+	$(CC) $(FLAGS) -o $@ $<
 
-$(EXECUTABLE): $(OBJECTS)
-	$(CC) $(LFLAGS) $(OBJECTS) -o $@
+thread: $(OBJECTS_BASIC) $(OBJECTS_THREAD)
+	$(CC) -lboost_thread -o $@ $+
 
-save.o: save.h save.cpp auxiliary.o classes.o
-	$(CC) $(CFLAGS) save.cpp
+super: $(OBJECTS_BASIC) $(OBJECTS_SUPER)
+	$(CC) -o $@ $+
 
-lattice.o: lattice.cpp lattice.h classes.o auxiliary.o
-	$(CC) $(CFLAGS) lattice.cpp
+depend:
+	$(CC) $(FLAGS) -MM $(SOURCES_BASIC) $(SOURCES_SUPER) $(SOURCES_THREAD) $(SOURCES_MAIN) >Makedep.rule
 
-classes.o: classes.cpp classes.h
-	$(CC) $(CFLAGS) classes.cpp
+Makedep.rule: Makefile
+	@echo "The makefile has changed since the last 'make depend'."
 
-auxiliary.o: auxiliary.cpp auxiliary.h
-	$(CC) $(CFLAGS) auxiliary.cpp
+# Dependencies for executable
+$(EXECUTABLE): $(OBJECTS_BASIC) $(OBJECTS_MAIN)
+	$(CC) $(LDFLAGS) -o $@ $+
 
-super: $(BASIC_SOURCES:.cpp=.o) $(SUPER:.cpp=.o)
-	$(CC) $(LFLAGS) $(BASIC_SOURCES:.cpp=.o) $(SUPER:.cpp=.o) -o $@
-
-main_super.o: main_super.cpp save.o auxiliary.o classes.o superInteraction.o
-	$(CC) $(CFLAGS) main_super.cpp
-
-superInteraction.o: superInteraction.cpp superInteraction.h lattice.o classes.o auxiliary.o
-	$(CC) $(CFLAGS) superInteraction.cpp
-
-tags:
-	etags $(SOURCES) $(SUPER)
+# Dependencies for object files
+include Makedep.rule
 
 clean:
-	\rm -v *.o *~
+	\rm -v *.o *~ a.out $(EXECUTABLE) super thread
+	touch -d20020101 Makedep.rule
+	make depend
+	make tags
 
+#use gz:
 tar:
 	tar -vzcf prog.tar.gz $(ALL_FILES)
 
 zip:
 	zip prog.zip $(ALL_FILES)
 
+#For Emacs-lovers
+tags:
+	etags *.h *.cpp
+
 lines:
-	wc -lc $(SOURCES) $(MY_HEADERS) $(SUPER)
+	wc -l *.h *.cpp

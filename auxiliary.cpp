@@ -12,15 +12,13 @@
 //See: http://www.gnu.org/software/libc/manual/html_node/Getopt.html
 //for information on the getopt()-function, which is what this entire
 //function uses.
-void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
-                   bool& interactionON, bool& quiet, int& interactionStrength,
-                   std::string& outputFileName, std::string& inputFileName,
-                   int& noRuns, char& nMethod, bool& jackknife, float& tracer){
+void argumentFlags(int argc, char** argv, InputValues& in){
 
   char* writeFileName = NULL;        //output file-name
   char* readFileName = NULL;         //output file-name
-  bool changedWriteFileName = false; //if output file-name changed
-  bool changedReadFileName = false;  //if input file-name changed
+
+  bool changedOutputFileName = false; //if output file-name changed
+  bool changedInputFileName = false;  //if input file-name changed
 
   bool error = false;
 
@@ -33,45 +31,45 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
   while((c = getopt(argc,argv,"lhqmw:r:i:jB:b:t:")) != -1)
     switch (c){
     case 'l':
-      logarithm = true;
+      in.isLogScale = true;
       break;
     case 'm':
-      lowMem = true;
+      in.isLowMem = true;
       break;
     case 'h':
-      printHelp(outputFileName,argv);
+      printHelp(in.outputFileName, argv);
       break;
     case 'q':
-      quiet = true;
+      in.isQuiet = true;
       break;
     case 'w':
       writeFileName = optarg;
-      changedWriteFileName = true;
+      changedOutputFileName = true;
       break;
     case 'r':
       readFileName = optarg;
-      changedReadFileName = true;
+      changedInputFileName = true;
       break;
     case 'i':
-      interactionStrength = atoi(optarg);
-      interactionON = true;
-      if (interactionStrength < 0) error = true;
+      in.interactionStrength = atoi(optarg);
+      in.isInteracting = true;
+      if (in.interactionStrength < 0) error = true;
       break;
     case 'j':
-      jackknife = true;
+      in.isJackknife = true;
       break;
     case 'b':
-      nMethod = 'b';
-      noRuns = atoi(optarg);
+      in.method = 'b';
+      in.nOutputs = atoi(optarg);
       ++usingMultipleOutputs;
       break;
     case 'B':
-      nMethod = 'B';
-      noRuns = atoi(optarg);
+      in.method = 'B';
+      in.nOutputs = atoi(optarg);
       ++usingMultipleOutputs;
       break;
     case 't':
-      tracer = atof(optarg);
+      in.jmpTracer = atof(optarg);
       break;
     case '?':
       error = true;
@@ -110,39 +108,37 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
   }
 
 
-
   //if none of the above specified arguments were passed:
   //take the first as new writeFileName, and print the rest as
   //errors
   int index;
-  bool more_than_one_invalid_argument = (changedWriteFileName) ? true : false;
+  bool moreThanOneInvalidArgument = (changedOutputFileName) ? true : false;
 
   for(index = optind; index < argc; index++){
     //only run first iteration & if we didn't change filename (with w|f)
-    if(!more_than_one_invalid_argument){
+    if(!moreThanOneInvalidArgument){
       writeFileName = argv[index];
-      changedWriteFileName = true;
+      changedOutputFileName = true;
     }
 
     //run for all invalid arguments except the first one
-    if(more_than_one_invalid_argument)
+    if(moreThanOneInvalidArgument)
       std::cout << "Non-option argument " << argv[index] << std::endl;
 
-    more_than_one_invalid_argument = true;
+    moreThanOneInvalidArgument = true;
   }
 
-  if(changedWriteFileName){
-    outputFileName = writeFileName;   //converts c-array to std::string
+  if(changedOutputFileName){
+    in.outputFileName = writeFileName; //converts c-array to std::string
     std::cout << "# Default output file changed to: "
-              << outputFileName << std::endl;
+              << in.outputFileName << std::endl;
   }
 
-  if(changedReadFileName){
-    inputFileName = readFileName;   //converts c-array to std::string
+  if(changedInputFileName){
+    in.inputFileName = readFileName;   //converts c-array to std::string
     std::cout << "# using input file: "
-              << inputFileName << std::endl;
+              << in.inputFileName << std::endl;
   }
-
 
 }
 
@@ -152,26 +148,26 @@ bool isComment(const std::string& line){
 
   //if line contains a '#' (anywhere)...
   unsigned int elementPos = line.find_first_of("#",0);
-  
+
   if (elementPos != std::string::npos){
 
-    //...check if it is preceded by ' ', and/or '\t', else not a comment  
+    //...check if it is preceded by ' ', and/or '\t', else not a comment
     std::string toPrecedComments = " \t";
     if (line.find_first_not_of(toPrecedComments) == elementPos)
       return true;
   }
 
   return false;
-} 
+}
 
 
 template<typename T>
 T convertString(const std::string& string){
-  //this is not optimal, since it does not return the state of the
+  //this is not optimal, since it does not return the stat of the
   //operation...
 
   std::istringstream stream(string);
-  
+
   T returnValue;
 
   stream >> returnValue;
@@ -181,7 +177,7 @@ T convertString(const std::string& string){
 }
 
 
-void readInputFile(std::string& fileToRead, int& xdim, int& ydim, 
+bool readInputFile(std::string& fileToRead, int& xdim, int& ydim,
                    int& zdim, int& particleNumber, int& ensembles,
                    int& numberOfValues, double& stopTime){
 
@@ -190,8 +186,9 @@ void readInputFile(std::string& fileToRead, int& xdim, int& ydim,
   std::ifstream readFile;
   readFile.open(fileToRead.c_str());
 
-  if (!readFile){
-    std::cerr << "ERROR: cant find " << fileToRead << std::endl;
+  if (!readFile){ //failed to open file.
+    std::cout << "# No input-file found." << std::endl;
+    return false;
   }
   else{
 
@@ -213,17 +210,17 @@ void readInputFile(std::string& fileToRead, int& xdim, int& ydim,
     ensembles =       (int) store[4];
     numberOfValues =  (int) store[5];
     stopTime =              store[6];
+
+    std::cout << "# Using input from file: " << fileToRead << std::endl;
+
+    return true;
   }
-
-  //for (int i = 0; i < store.size(); i++)
-  //  std::cout << "check: " << store[i] << std::endl;
-
 }
 
 
 template<typename T>
 T getNonCommentInput(){
-  
+
   std::string s;
 
   //get non-comment line:
@@ -231,7 +228,7 @@ T getNonCommentInput(){
   do{
     getline(std::cin,s);
   }while(isComment(s));
-  
+
   return convertString<T>(s);
 
 }
@@ -272,46 +269,35 @@ void askUserForInputParameters(int& xdim, int& ydim, int& zdim,
 void printHelp(std::string File, char** argv){
   std::string defaultFileName = File;
   std::cout << "USAGE" << std::endl << "-----" << std::endl;
-  std::cout << "\t" << argv[0] <<" [OPTIONS]" << std::endl << std::endl;
+  std::cout << argv[0] <<" [OPTIONS]" << std::endl << std::endl;
 
   std::cout << "OPTIONS" << std::endl <<"-------" << std::endl;
   std::cout << "-i M\t Set interactions to ON with interaction strength \"M\".\n\t Note: M >= 0, since it will be used in the Boltzmann step as \"exp(-M)\"."<<std::endl;
-  std::cout << "-l \t Set log-spacing between data values to be written to\n\t output-file to ON." << std::endl;
+  std::cout << "-l \t Set log-spaced data values to ON." << std::endl;
   std::cout << "-m\t Use the low memory consuming algorithm for computing std err." << std::endl;
   std::cout << "-w NAME\t Set output-file to 'NAME'." << std::endl;
   std::cout << "-r NAME\t Set input-file to 'NAME'." << std::endl;
   std::cout << "NAME\t Set first non-valid options-flag as name of output-file.\n \t(shorter/faster version than using the '-w' option)"<<std::endl;
   std::cout << "-q\t Set \"quiet mode\"=true. I.e print less information to the screen." << std::endl;
   std::cout << "-j\t Turn on the jackknife algorithm. The -m flag can not be used in this mode." << std::endl;
-  std::cout << "-b\t Generate the N number of outfiles (NAME0, NAME1,...) using bootstrap." << std::endl;
-  std::cout << "-B\t Generate the N number of outfiles (NAME0, NAME1,...) using Bruteforce." << std::endl;
+  std::cout << "-b N\t Generate the N number of outfiles (NAME0, NAME1,...) using bootstrap." << std::endl;
+  std::cout << "-B N\t Generate the N number of outfiles (NAME0, NAME1,...) using Bruteforce." << std::endl;
+  std::cout << "-t K\t Set tracer jumprate to K. Default = 1" << std::endl;
 
-  std::cout << std::endl << "Arguments can be given in any order. If no flags are set the first argument following \""<<argv[0]<<"\" will be taken as the output-file name. With no arguments given the default is log-spacing of values to output-file \"" << defaultFileName <<"\" without any interactions at all. Note, with '-i 0' the interaction strength will be 0, but the interaction code will be turned ON, resulting in a slower simulation run, therefore the default circumvents the interaction calculations entirely."<<std::endl<<std::endl;
+  std::cout << std::endl << "Arguments can be given in any order, and can be grouped (like \"-li 4\"). If no flags are set the first argument following \"" <<argv[0]<<"\" will be taken as the output-file name.\n Note, with '-i 0' the interaction strength will be 0, but the interaction code will be turned ON, resulting in a slower simulation run, therefore the default circumvents the interaction calculations entirely."<<std::endl<<std::endl;
 
   std::cout << "EXAMPLES" << std::endl << "--------" << std::endl;
 
   std::cout << "\t" << argv[0] << " 5.5/uniform04.dat" << std::endl
-       << "\t" << argv[0] <<" -w 5.5/uniform04.dat" << std::endl
-       << "Puts the output in the folder \"5.5\" with the name \"uniform04.dat\"."
-       << std::endl;
+            << "\t" << argv[0] <<" -w 5.5/uniform04.dat" << std::endl
+            << "Puts the output in the folder \"5.5\" with the name \"uniform04.dat\"."
+            << std::endl;
 
-  std::cout <<"\t"<< argv[0] <<" -li 4" << std::endl
-      <<"Use log-spacing, and interaction strength DeltaPhi/(K_b*T)=4."
-      <<std::endl;
-
-    std::cout << "\t" << argv[0] <<" -B 1000 -w brute.dat" << std::endl
-       << "Generate 1000 output-files: brute.dat0, brute.dat1, etc, using brute force method"
-       << std::endl;
-
-  std::cout <<"\t" << argv[0] <<" -li 4 powerlaw.dat" << std::endl
-      <<"Since the first argument without flag will be interpreted as \"-w arg.\" this is the same as the previous example, with the additional \"-w powerlaw.dat\" argunment. Note: Be careful when using this, to make sure you are not giving the name as argument to the \"-i\" flag (like \"-i name.out\" would not give an error)."<<std::endl;
-
-  std::cout <<"\t" << argv[0] <<" -li 4 powerlaw01.dat < input01.dat" << std::endl
-      <<"Same as previous example but read from the input01.dat-file instead of from the keyboard. The file input01.dat has the same form as what you would type at the keyboard after execution begins." <<std::endl;
+  std::cout << "\t" << argv[0] << " -B 1000 -w brute.dat" << std::endl
+            << "Use brute force, save to brute.dat0 ... brute.dat999.\n";
   std::cout << std::endl;
 
   exit(0);
-
 }
 
 

@@ -13,8 +13,11 @@ private:
 
   void superInteractionCode(int, int);
 
-  double sumFrictionCoefficient(std::vector<int>);  //sum over many particles
-  double sumFrictionCoefficient(int);               //sum over one particle
+  //sum over many particles
+  double sumFrictionCoefficient(std::vector<int>) const;
+  
+  //sum over one particle
+  double sumFrictionCoefficient(int) const;
 
   void calculateExtent(std::vector<int>&, int, int&, int&);
 
@@ -25,18 +28,17 @@ private:
   void printPositionToScreen(std::vector<int>);
   void printPositionToScreen(int);
 
-  void controlVacancyCheck3(int );
+  void controlVacancyCheck3(int);
 
   void moveAndBoundaryCheck(int, int);   //overload function.
-
 
 public:
   SuperInteraction(int,int,int, int, double, bool, float);
   void move(void);              //overload the lattice-class version
-  void setInteraction(float);   //don't actually use this one, thus redefine it.
+
+  //don't actually use this one, thus redefine it.
+  void setInteraction(float) const;
 
 };
-
-//TODO hur funkar boundary-booleanen?
 
 #endif

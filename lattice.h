@@ -11,17 +11,37 @@
 using namespace std;
 
 class Lattice {
-private:
-  bool interactionOn_;                      //use the interaction algorithm
-  void interaction(int, Particle);
-  vector<float> clusterDistribution_, clusterSize_; //For our save_cluster()-function
-  void buildCluster2(int, vector<int>&, double);    //needed for save_cluster()-func.
+public:
+  Lattice(int x, int y, int z, int N, 
+          double deed, bool boundaryFix);
+
+  void place(void);                        //Place particles on the lattice
+  void move(void);                         //pick a particle & direction based on jump-rate
+
+  void generateTrajectory(int&);           //same as place() + move()
+
+  int getDimension(void) const;
+  void getDisplacement(vector<int>&, vector<int>&,
+                       vector<int>&, vector<double>&) const;
+  void setSamplingTimes(const vector<double>&, bool);
+  void setInteraction(float);             //determine if we use the interaction-algorithm
+  void setJumpNaka(float, float);
+  void setDist(int, double);
+
+  float computeNakazato(void);
+  float computeErgodicity(int,int,int);   //Calculate the theoretical MSD when ergodic
+  float computeAverageDiffusionConst(void);
+  float computeEffectiveDiffusionConst(void);
+
+  //Set jump-rate of each particle and direction
+  void setJumpRate(const vector<Jump>&);
+
 
 protected:
   Ran randomNumber;                        //generator accessible to all class members
 
   float interactionStrength_;              //only used if "InteractionOn=true"
-  void checkVacancyMatrix(float);          //test-function
+  bool checkVacancyMatrix(void) const;     //test-function
   void countNeighbours(Particle, vector<int>&);
 
   vector<Particle> pos_;                   //XYZ-position for each particle on the lattice
@@ -52,7 +72,7 @@ protected:
   void moveAndBoundaryCheck(int,int);
 
   int vacancyCheck(int, const Particle&); //Same as above, but improved. Use this one instead.
-  vector<vector<vector<short> > > vacancy_; //Needed in my more efficient "vacancyCheck()"
+  vector<vector<vector<int> > > vacancy_; //Needed in my more efficient "vacancyCheck()"
 
   float jumpCrowders_, jumpTracer_;        //only used in the Nakazato()-function
   bool testOnOff_;                         //To print detailed information to screen
@@ -63,27 +83,12 @@ protected:
   bool isExponentialWaitingTime_;
   double computeWaitingTime(void);
 
-public:
-  Lattice(int, int, int, int, double, bool);
-  void place(void);                        //Place particles on the lattice
-  void move(void);                         //pick a particle & direction based on jump-rate
-  void generateTrajectory(int&);           //same as place() + move()
-  int getDimension(void);
-  void getDisplacement(vector<int>&, vector<int>&,
-                       vector<int>&, vector<double>&);
-  void setSamplingTimes(const vector<double>&, bool);
-  void setInteraction(float);             //determine if we use the interaction-algorithm
-  void setJumpNaka(float, float);
-  void setDist(int, double);
 
-  float computeNakazato(void);
-  float computeErgodicity(int,int,int);   //Calculate the theoretical MSD when ergodic
-  float computeAverageDiffusionConst(void);
-  float computeEffectiveDiffusionConst(void);
-
-  //Set jump-rate of each particle and direction
-  void setJumpRate(const vector<Jump>&);
-
+private:                                    //not shared with suerInteraction
+  bool interactionOn_;                      //use the interaction algorithm
+  void interaction(int, Particle);
+  vector<float> clusterDistribution_, clusterSize_; //For our save_cluster()-function
+  void buildCluster2(int, vector<int>&, double);    //needed for save_cluster()-func.
 };
 
 

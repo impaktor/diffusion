@@ -3,28 +3,18 @@
 #include <cmath>           //gives sqrt, pow, fabs,
 #include <vector>
 
-//#include "nr/ran_mod.h"    //Random number generator from numerical recipes 3ed.
-
 #include "classes.h"       //various data structures /classes (Jump, Particle)
 #include "lattice.h"       //this is the main class, that does the physics.
+#include "global.h"        //global constants, for testing on/off, etc. 
 
 using namespace std;
-
-//HARDCODED VARIABLES:
-//-------------------
-
-//boolean, prints details to screen
-const bool TEST_1            = 0;
-
-//CPU consuming, use only when bug-squashing!
-const bool CHECK_VACANCY_ON  = 0;
 
 // =====================
 // C O N S T R U C T O R
 // =====================
 
-Lattice::Lattice(int xSquare,int ySquare,int zSquare,
-                 int particleNumber, double seed, bool boundary)
+Lattice::Lattice(const int xSquare,const int ySquare,const int zSquare,
+                 int particleNumber, double seed, bool boundaryFix)
   //initiate the random number generator with "seed" just given
   : randomNumber(seed){
 
@@ -38,7 +28,7 @@ Lattice::Lattice(int xSquare,int ySquare,int zSquare,
 
       noParticles_ = particleNumber;
 
-      boundaryFix_ = boundary;
+      boundaryFix_ = boundaryFix;
 
       //place tagged particle at lattice center
       pos_0_.x = round(1.0*latticeX_/2);
@@ -139,34 +129,31 @@ void Lattice::place(void){
     for (int q = 0; q < noParticles_; q++)
       cout <<" PLACED \n particle n = " << q << pos_[q] << endl;
 
-
-  //IF we use the new vacancyCheck()-function:
-  //-----------------------------------
-  //initiate the vacancy-vector with "-1" (meaning vacant)
+  //Also use a matrix representation of the lattice, for speed:
+  //"-1" = vacant. Integers > -1 are corresponds to vector index 
   //Must reset this matrix for each ensemble.
-  vector< vector< vector<short> > >
-    Vacancy(latticeX_+1, vector< vector<short> >
-            (latticeY_+1, vector<short>(latticeZ_+1,-1)));
-  vacancy_ = Vacancy;
+  vector< vector< vector<int> > > 
+    tmp_vacancy(latticeX_+1, vector< vector<int> > 
+                (latticeY_+1, vector<int>(latticeZ_+1,-1)));
+  vacancy_ = tmp_vacancy;
   //Mark occupied sites with particle label for that site:
   //note, no change will ever occur to the 0-elements of the matrix,
   //since out lattice starts at 1,..,latticeX_, but matrix is 0,..,latticeX_
-  for (n=0; n < noParticles_; n++){
+  for (n = 0; n < noParticles_; n++){
     vacancy_[ pos_[n].x ][ pos_[n].y ][ pos_[n].z ] = n;
   }
 }
 
 
+//This is just a small function to check that the vacancy matrix is correct
+//ie. vacant sites are marked as "-1" and occupied are marked with the
+//correct particle label. Mostly (only) used by superInteraction. Very handy.
+bool Lattice::checkVacancyMatrix(void) const{
 
-void Lattice::checkVacancyMatrix(float ErrorCode){
-  //This is just a small function to check that the vacancy matrix is correct
-  //ie. vacant sites are marked as "-1" and occupied are marked with the
-  //correct particle label.
-  //ErrorCode = code to output to easier find the place in the code
-
+  bool no_error = true;  //if no error
+  
   if(CHECK_VACANCY_ON){
 
-    bool error = false;
     int label;
     int count_vacant_sites = 0;
 
@@ -180,7 +167,7 @@ void Lattice::checkVacancyMatrix(float ErrorCode){
           //cout <<"label: "<< label <<endl;
           if(label != -1){
             if(i != pos_[label].x || j != pos_[label].y || k != pos_[label].z){
-              error = true;
+              no_error = false;
             }
           }
           else
@@ -192,24 +179,12 @@ void Lattice::checkVacancyMatrix(float ErrorCode){
     if (count_vacant_sites != latticeX_*latticeY_*latticeZ_-noParticles_){
       cerr << "Error in vacant sites" << endl
            << "# of vacant sites: " << count_vacant_sites << endl;
-      error = true;
+      no_error = false;
     }
-
-    if(error){
-      cerr << "Vacancy Matrix is not correct, at err. code site: "
-           << ErrorCode << endl;
-      abort();
-    }
-  }// end of if(CHECK_VACANCY_ON)
+  }
+  
+  return no_error;
 }
-
-
-// double Lattice::get_dt(void){
-//   //Needed for the newly added binning-function
-//   //to produce a histogram of P(x,t)
-//   //(and for the snapshot-function, see "main()")
-//   return partialSum_.back();
-// }
 
 
 // ---------------------
@@ -217,7 +192,7 @@ void Lattice::checkVacancyMatrix(float ErrorCode){
 // ---------------------
 
 void Lattice::setSamplingTimes(const vector<double>& samplingTime,
-                               bool isExpWaitingTime = false){ //XXX set this in header I think?
+                               bool isExpWaitingTime = false){
 
   isExponentialWaitingTime_ = isExpWaitingTime;
 
@@ -226,7 +201,7 @@ void Lattice::setSamplingTimes(const vector<double>& samplingTime,
   if (noSamplingTimes_ < 1)
     printError("No sampling times set!");
 
-  //check that is is monotonously increasing:
+  //check that it is monotonously increasing:
   bool isOrdered = false;
   for (int i = 1; i < noSamplingTimes_; i++){
     if (samplingTime[i-1] < samplingTime[i])
@@ -253,12 +228,13 @@ void Lattice::setSamplingTimes(const vector<double>& samplingTime,
 }
 
 
-void Lattice::setJumpNaka(float jumpCrowders, float jumpTracer){
+void Lattice::setJumpNaka(const float jumpCrowders, 
+                          const float jumpTracer){
   jumpCrowders_ = jumpCrowders;
   jumpTracer_ = jumpTracer;
 }
 
-void Lattice::setInteraction(float interactionStrength){
+void Lattice::setInteraction(const float interactionStrength){
   interactionStrength_ = interactionStrength;
   interactionOn_ = true;
 }
@@ -267,13 +243,11 @@ void Lattice::setInteraction(float interactionStrength){
 void Lattice::generateTrajectory(int& E){
   //This is just a wrapper for easier passing to the thread-library.
 
-  place();
-  move();
-  //getDisplacement();
+  place();  //place particles on lattice
+  move();   //perform a simulation
 
   //increase the iterator that counts ensembles:
   ++E;
-
 }
 
 // ---------------------
@@ -281,12 +255,12 @@ void Lattice::generateTrajectory(int& E){
 // ---------------------
 
 //could be useful to have, but not necessary...
-int Lattice::getDimension(void){
+int Lattice::getDimension(void) const{
   return dim_;
 }
 
 void Lattice::getDisplacement(vector<int>& dx, vector<int>& dy,
-                              vector<int>& dz, vector<double>& dr){
+                              vector<int>& dz, vector<double>& dr) const{
   //Get the displacement of the tracer particle
   //from the current "ensemble"
   dx = dx_;
@@ -322,79 +296,71 @@ void Lattice::moveAndBoundaryCheck(int n, int R){
     if ( R >= 0 && R < 6 ){
       switch(R){
       case 0: pos_[n].x = pos_[n].x +1;
-        if (pos_[n].x == latticeX_ +1 && boundaryFix_ == 0){
-          pos_[n].x = 1;
-
-          if (n==0){
-            windingNumber_0_x++;
-            changingWindingNumber = true;
-          }
+        if (pos_[n].x == latticeX_ +1){
+            pos_[n].x = boundaryFix_ ? old.x : 1;
+            
+            //if the tagged particle...
+            if (n==0 && !boundaryFix_){
+              windingNumber_0_x++;
+              changingWindingNumber = true;
+            }
         }
-
-        if (pos_[n].x == latticeX_ +1 && boundaryFix_ == 1) pos_[n].x = old.x;
         break;
       case 1: pos_[n].x = pos_[n].x -1; //move particle n to the left
-        if (pos_[n].x == 0 && boundaryFix_ == 0){
-          pos_[n].x = latticeX_;
-
-          if (n==0) {
+        if (pos_[n].x == 0){
+          pos_[n].x = boundaryFix_ ? old.x : latticeX_;
+            
+          if (n==0 && !boundaryFix_){
             windingNumber_0_x--;
             changingWindingNumber = true;
           }
         }
-        if (pos_[n].x == 0 && boundaryFix_ == 1) pos_[n].x = old.x;    //fix
         break;                          //(first coordinate is 1, 0=outside)
       case 2: pos_[n].y = pos_[n].y +1;
-        if (pos_[n].y == latticeY_ +1 && boundaryFix_ == 0){
-          pos_[n].y = 1;
+        if (pos_[n].y == latticeY_ +1){
+          pos_[n].y = boundaryFix_ ? old.y : 1;
 
-          if (n==0){
+          if (n==0 && !boundaryFix_){
             windingNumber_0_y++;
             changingWindingNumber = true;
           }
         }
-        if (pos_[n].y == latticeY_ +1 && boundaryFix_ == 1) pos_[n].y = old.y;
         break;
       case 3: pos_[n].y = pos_[n].y -1;
-        if (pos_[n].y == 0 && boundaryFix_ == 0){
-          pos_[n].y = latticeY_;
-
-          if (n==0){
+        if (pos_[n].y == 0 ){
+          pos_[n].y = boundaryFix_ ? old.y : latticeY_;
+          
+          if (n==0 && !boundaryFix_){
             windingNumber_0_y--;
             changingWindingNumber = true;
           }
         }
-        if (pos_[n].y == 0 && boundaryFix_ == 1) pos_[n].y = old.y;
         break;
       case 4: pos_[n].z = pos_[n].z +1;
-        if (pos_[n].z == latticeZ_+1 && boundaryFix_ == 0){
-          pos_[n].z = 1;
-
-          if (n==0){
+        if (pos_[n].z == latticeZ_+1){
+          pos_[n].z = boundaryFix_ ? old.z : 1; 
+            
+          if (n==0 && !boundaryFix_){
             windingNumber_0_z++;
             changingWindingNumber = true;
           }
         }
-        if (pos_[n].z == latticeZ_+1 && boundaryFix_ == 1) pos_[n].z = old.z;
         break;
       case 5: pos_[n].z = pos_[n].z-1;
-        if (pos_[n].z == 0 && boundaryFix_ == 0){
-          pos_[n].z = latticeZ_;
-
-          if (n==0){
-            windingNumber_0_z--;
-            changingWindingNumber = true;
+        if (pos_[n].z == 0){
+          pos_[n].z = boundaryFix_ ? old.z : latticeZ_;
+         
+          if (n==0 && boundaryFix_ == 0){
+              windingNumber_0_z--;
+              changingWindingNumber = true;
           }
         }
-        if (pos_[n].z == 0 && boundaryFix_ == 1) pos_[n].z = old.z;
         break;
       }
 
       //check that the new site is vacant if not,
       //move the particle back. (done by the vacancyCheck...)
       //(and if using windingnumber, reset it.)
-
-      //vacancyCheckOld(n,temp);  //Old code (slow)
 
       //New improved, faster version.
       bool resetWindingNumber = vacancyCheck(n,old);
@@ -439,70 +405,62 @@ void Lattice::moveAndBoundaryCheck(int n, int R){
 
 
 
-
+//check if site is vacant or not
 int Lattice::vacancyCheck(int n, const Particle& oldPos){
-  //NOTE: This is a faster version than vacancyCheckOld(), since that
-  //one loops through all particles for each "vacancy check". However
-  //this uses a 3D matrix, and there will be some "double banking"
-  //in the sense that the position is now stored in this matrix and
-  //in XYZ-vectors. (use reference ('&') for speed)
+  int returnvalue = 0;   //unused parameter to register collisions
 
-  if (n < noParticles_ && 0 <= n){
+  if (n > noParticles_ || 0 > n)
+    printError("accessing invalid particle");
+  
+  if (vacancy_[pos_[n].x][pos_[n].y][pos_[n].z] != -1){ //if occupied
+    if (testOnOff_) cout << "Occupied: " << pos_[n] << endl;
+    pos_[n] = oldPos;                                 //then move back
+    returnvalue = 1;
 
-    int returnvalue = 0;   //unused parameter to register collisions
-    if (vacancy_[pos_[n].x][pos_[n].y][pos_[n].z] != -1){ //if occupied
-      if (testOnOff_) cout << "Occupied: " << pos_[n] << endl;
-      pos_[n] = oldPos;                                 //then move back
-      returnvalue = 1;
-
-      if (testOnOff_ && false){  //permanently off with the "false"
-        for (int k = 1; k <= latticeZ_; k++){
-          //print y in reverse direction, (better in the terminal)
-          for (int j = latticeY_; j > 0; j--){
-            cout << j << ": ";
-            for (int i = 1; i <= latticeX_; i++){
-              cout << vacancy_[i][j][k] << " ";
-            }
-            cout << endl;
+    if (testOnOff_ && false){  //permanently off with the "false"
+      for (int k = 1; k <= latticeZ_; k++){
+        //print y in reverse direction, (better in the terminal)
+        for (int j = latticeY_; j > 0; j--){
+          cout << j << ": ";
+          for (int i = 1; i <= latticeX_; i++){
+            cout << vacancy_[i][j][k] << " ";
           }
-          cout << "looping for new Z" << endl;
+          cout << endl;
         }
+        //print message for next layer: (since 3D on a 2D screen)
+        cout << "looping for new Z" << endl;
       }
     }
-    else{
-      //if no interaction att all:
-
-      //if vacant, update vacancy_-matrix
-      if(!interactionOn_){
-        //old position is now vacant
-        vacancy_[oldPos.x][oldPos.y][oldPos.z] = -1;
-
-        //new position is now occupied:
-        vacancy_[pos_[n].x][pos_[n].y][pos_[n].z] = n;
-
-        if (testOnOff_) cout << "OK, vacant" << endl;
-      }
-      //if we use the interaction algorithm:
-      else
-        interaction(n,oldPos);
-    }
-    if (testOnOff_) cout << "Vacant, particle " << n <<": "
-                         << pos_[n] << endl;
-    return returnvalue;
-    //(the return value could be used to have a
-    //    do-move-while(vacancyCheck == 1)
-    //but if so, we need to move this function to be directly in the
-    //Move_()-func.)
   }
   else{
-    printError("accessing invalid particle");
-  }
+    //if no interaction att all:
 
+    //if vacant, update vacancy_-matrix
+    if(!interactionOn_){
+      //old position is now vacant
+      vacancy_[oldPos.x][oldPos.y][oldPos.z] = -1;
+
+      //new position is now occupied:
+      vacancy_[pos_[n].x][pos_[n].y][pos_[n].z] = n;
+
+      if (testOnOff_) cout << "OK, vacant" << endl;
+    }
+    //if we use the interaction algorithm:
+    else
+      interaction(n,oldPos);
+  }
+  if (testOnOff_) 
+    cout << "Vacant, particle " << n <<": " << pos_[n] << endl;
+
+  return returnvalue;
+  //(the return value could be used to have a
+  //    do-move-while(vacancyCheck == 1)
+  //but if so, we need to move this function to be directly in the
+  //Move_()-func.)
 }
 
-
+//compute waiting time:
 double Lattice::computeWaitingTime(void){
-  //compute waiting time:
 
   //one time step
   double tau;
@@ -553,20 +511,10 @@ void Lattice::move(){
 
       dr_[i] = sqrt( pow(dx_[i],2) + pow(dy_[i],2) + pow(dz_[i],2) );
 
-
-      //TEST: KAOS / CHAOS-project: if I want to store coordinates
-      //rather than displacement. good for seeing brownian walk.
-      //dx_[i] = pos_[0].x;
-      //dy_[i] = pos_[0].y;
-      //dz_[i] = pos_[0].z;
-      //dr_[i] = sqrt( pow(dx_[i],2) + pow(dy_[i],2) + pow(dz_[i],2) );
-
-
       i++;
     }
 
-
-    double r2;          //store random number here
+    double r2;          //stores random number
 
     int mu_guess;       // must be integer. (index of vector)
     int mu_left = 0;
@@ -649,9 +597,8 @@ void Lattice::setJumpRate(const vector<Jump>& jumpRate){
     computePartialSum();
 
   }
-  else{
+  else
     printError("number of jumprates must equal number of particles");
-  }
 }
 
 
@@ -712,9 +659,7 @@ void Lattice::computePartialSum(void){
 }
 
 
-void Lattice::convertMuToParticle(int mu, int& n, int& direction){
-  //Perhaps using binary search here would speed things up?
-  //Well, I'll settle for replacing some if --> else, see below
+void Lattice::convertMuToParticle(const int mu, int& n, int& direction){
 
   //if no error or inconsistency...
   if (0 <= mu && mu <= (int) partialSum_.size() -1){
@@ -764,7 +709,7 @@ void Lattice::convertMuToParticle(int mu, int& n, int& direction){
   }
 }
 
-
+//called from main, to print out fun/useful fact to head of data-file.
 float Lattice::computeEffectiveDiffusionConst(void){
   float D_eff;
 
@@ -776,22 +721,22 @@ float Lattice::computeEffectiveDiffusionConst(void){
 
     if (dim_ >= 1){
       for (int i=0; i < noParticles_; i++){
-        sum_temp = sum_temp + 1.0/jumpRate_[i].x.l;
-        sum_temp = sum_temp + 1.0/jumpRate_[i].x.l;
+        sum_temp += 1.0/jumpRate_[i].x.l;
+        sum_temp += 1.0/jumpRate_[i].x.l;
       }
     }
 
     if (dim_ >= 2){
       for (int i=0; i < noParticles_; i++){
-        sum_temp = sum_temp + 1.0/jumpRate_[i].y.r;
-        sum_temp = sum_temp + 1.0/jumpRate_[i].y.l;
+        sum_temp += 1.0/jumpRate_[i].y.r;
+        sum_temp += 1.0/jumpRate_[i].y.l;
       }
     }
 
     if (dim_ == 3){
       for (int i=0; i < noParticles_; i++){
-        sum_temp = sum_temp + 1.0/jumpRate_[i].z.r;
-        sum_temp = sum_temp + 1.0/jumpRate_[i].z.l;
+        sum_temp += 1.0/jumpRate_[i].z.r;
+        sum_temp += 1.0/jumpRate_[i].z.l;
       }
     }
 
@@ -816,9 +761,9 @@ float Lattice::computeEffectiveDiffusionConst(void){
 }
 
 
-
+//called from main, to print out fun/useful fact to head of data-file.
 float Lattice::computeAverageDiffusionConst(void){
-  //Calculate Average as well:
+  //Calculate Average:
 
   float D_av = 0;
 
@@ -826,19 +771,19 @@ float Lattice::computeAverageDiffusionConst(void){
 
     int startingParticle = 1;  //don't include the tagged
     for (int i = startingParticle; i < noParticles_; i++){
-      D_av = D_av + jumpRate_[i].x.r;
-      D_av = D_av + jumpRate_[i].x.l;
+      D_av += jumpRate_[i].x.r;
+      D_av += jumpRate_[i].x.l;
     }
     if(dim_ > 1){
       for (int i = startingParticle; i < noParticles_; i++){
-        D_av = D_av + jumpRate_[i].y.r;
-        D_av = D_av + jumpRate_[i].y.l;
+        D_av += jumpRate_[i].y.r;
+        D_av += jumpRate_[i].y.l;
       }
     }
     if (dim_>2){
       for (int i = startingParticle; i < noParticles_; i++){
-        D_av = D_av + jumpRate_[i].z.r;
-        D_av = D_av + jumpRate_[i].z.l;
+        D_av += jumpRate_[i].z.r;
+        D_av += jumpRate_[i].z.l;
       }
     }
     D_av = D_av * 1.0/(noParticles_ * 2 * dim_);
@@ -860,7 +805,7 @@ float Lattice::computeAverageDiffusionConst(void){
   }
 }
 
-
+//called from main, to print out fun/useful fact to head of data-file.
 float Lattice::computeNakazato(void){
 
   float alpha;
@@ -891,7 +836,7 @@ float Lattice::computeNakazato(void){
 }
 
 
-
+//called from main, to print out fun/useful fact to head of data-file.
 float Lattice::computeErgodicity(int x_rutor, int y_rutor, int z_rutor){
   //check what the MSD should be when the system reaches equilibrium.
   //(only correct if N=1). This function has two independent parts.
@@ -952,15 +897,6 @@ float Lattice::computeErgodicity(int x_rutor, int y_rutor, int z_rutor){
 
 
 
-
-
-
-
-
-
-
-
-
 // -------------------------
 // INTERACTION SPECIFIC CODE
 // -------------------------
@@ -975,7 +911,7 @@ void Lattice::interaction(int n, Particle oldPos){
   //the boundary also...
   //The output-files are identical between the two different version,
   //when I use fixed boundary conditions, which was what I used in my
-  // thesis.
+  //master thesis.
   countNeighbours(oldPos, NearestNeighbours);
 
   int counter = NearestNeighbours.size();
@@ -1000,104 +936,7 @@ void Lattice::interaction(int n, Particle oldPos){
 }
 
 
-
-
-//IMPORTED FROM TESTInteractionCode() 12/7 -2010
-//NOTE! BUT! "Exponent" changed to allow 100% probability of being included.
-void Lattice::buildCluster2(int n, vector<int>& NearestNeighbours,
-                              double Exponent){
-  vector<int> unique;
-  vector<int> NewParticleAdded;
-
-  //Build a vector with particles that form the Cluster:
-  //-------------------------------------------------
-  //each neighbor has a probability given by the Boltzmann factor:
-  //    exp(-1.0*Exponent)
-  //to belong to the cluster.
-
-  //Question: What happens when we're at the boundary?
-  //Answer:   That's dealt with by the countNeighbors()-function
-
-  //n included with 100 % probability:
-  unique.push_back(n);
-
-  bool CheckAgain;   //true if a new particle was added to the cluster
-
-  do{
-    CheckAgain = false;
-
-    int limit = NearestNeighbours.size();
-    for(int i = 0; i< limit; i++){
-      int m = NearestNeighbours[i];
-      countNeighbours(pos_[m], NearestNeighbours);
-      //NearestNeighbours-vector will store more particles each
-      //iteration, but only loop over the first initial set (ie. i < limit)
-    }
-
-    for(unsigned int j = 0; j < NearestNeighbours.size(); j++){
-      bool SingleValued=true;
-
-      //Check if it's stored in unique[] already:
-      for(unsigned int k = 0; k < unique.size(); k++){
-        if (NearestNeighbours[j] == unique[k])
-          SingleValued = false;
-      }
-      if(SingleValued){
-        //Add the new particle, with Boltzmann's consent...
-        // rand = randomNumber.doub();
-        //if (rand >=  exp(-1.0*Exponent)){
-        unique.push_back(NearestNeighbours[j]);
-        NewParticleAdded.push_back(NearestNeighbours[j]);
-        //New particles added to the cluster, run the loop again
-        //for particles in NewParticleAdded to check the neighbors
-        // of this new particle
-        CheckAgain = true;
-        //}
-      }
-    }
-
-    NearestNeighbours = NewParticleAdded;
-    NewParticleAdded.clear();
-
-  }while(CheckAgain);
-
-  //Now save the final vector (cluster) and return it as a reference:
-  NearestNeighbours = unique;
-
-
-  if(false){ //Inactivated, for now
-    //TEST:
-    cout << "kollar Nearest Neighbour.size(): "<<NearestNeighbours.size()<<endl;
-    for(unsigned int j=0; j < NearestNeighbours.size(); j++){
-      int m = NearestNeighbours[j];
-      cout <<"m = " << m << " (" << pos_[m].x << "," << pos_[m].y
-           << "," << pos_[m].z << ")"<< endl;
-    }
-  }
-
-  //TEST
-  for (int i=0; i < noParticles_; i++){
-    if (pos_[i].x==0 || pos_[i].y==0 || pos_[i].z==0)
-      printError("Outside of lattice");
-  }
-
-  //TEST---------(FÖR ATT KOLLA DOUBLE COUNTING)
-  bool IsUniqueTrue = true;
-  for(unsigned int i = 0; i < unique.size(); i++){
-    for(unsigned int j = 0; j < unique.size(); j++){
-      if (unique[i] == unique[j] && i != j)
-        IsUniqueTrue = false;
-    }
-  }
-  if(!IsUniqueTrue)
-    printError("Unique is not unique! Error *235897*");
-  //-------------
-}
-
-
-
-
-void Lattice::countNeighbours(Particle particle, vector<int>& Count){
+void  Lattice::countNeighbours(Particle particle, vector<int>& Count){
   //Each element in the vector "Count" is a particle, and the
   //value of the element is the particle label.
   //If the particle is "alone" the vector Count will be empty.
@@ -1110,75 +949,62 @@ void Lattice::countNeighbours(Particle particle, vector<int>& Count){
   else  periodic = false;
 
   if (particle.x+1 <= latticeX_ ){ //avoid falling off the edge of the world
-    if (vacancy_[particle.x+1][particle.y][particle.z] != -1){
+    if (vacancy_[particle.x+1][particle.y][particle.z] != -1)
       Count.push_back( vacancy_[particle.x+1][particle.y][particle.z] );
-    }
   }
   else{
-    if (vacancy_[1][particle.y][particle.z] != -1 && periodic){
+    if (vacancy_[1][particle.y][particle.z] != -1 && periodic)
       Count.push_back( vacancy_[1][particle.y][particle.z] );
-    }
   }
 
   if (particle.x-1>0){
     //although this zero-element exists in the vacancy_ matrix (i.e. no seg. fault)
     //the first coordinate on the lattice is (1,1,1). (0,0,0) is undefined
-    if (vacancy_[particle.x-1][particle.y][particle.z] != -1){
+    if (vacancy_[particle.x-1][particle.y][particle.z] != -1)
       Count.push_back( vacancy_[particle.x-1][particle.y][particle.z] );
-    }
   }
   else{
-    if (vacancy_[latticeX_][particle.y][particle.z] != -1 && periodic){
+    if (vacancy_[latticeX_][particle.y][particle.z] != -1 && periodic)
       Count.push_back( vacancy_[latticeX_][particle.y][particle.z] );
-    }
   }
 
 
 
   if (particle.y+1 <= latticeY_){
-    if (vacancy_[particle.x][particle.y+1][particle.z] != -1){
+    if (vacancy_[particle.x][particle.y+1][particle.z] != -1)
       Count.push_back( vacancy_[particle.x][particle.y+1][particle.z] );
-    }
   }
   else{
-    if (vacancy_[particle.x][1][particle.z] != -1 && periodic){
+    if (vacancy_[particle.x][1][particle.z] != -1 && periodic)
       Count.push_back( vacancy_[particle.x][1][particle.z] );
-    }
   }
 
   if (particle.y-1>0){
-    if (vacancy_[particle.x][particle.y-1][particle.z] != -1){
+    if (vacancy_[particle.x][particle.y-1][particle.z] != -1)
       Count.push_back( vacancy_[particle.x][particle.y-1][particle.z] );
-    }
   }
   else{
-    if (vacancy_[particle.x][latticeY_][particle.z] != -1 && periodic){
+    if (vacancy_[particle.x][latticeY_][particle.z] != -1 && periodic)
       Count.push_back( vacancy_[particle.x][latticeY_][particle.z] );
-    }
   }
 
 
   if (particle.z+1 <= latticeZ_){
-    if (vacancy_[particle.x][particle.y][particle.z+1] != -1){
+    if (vacancy_[particle.x][particle.y][particle.z+1] != -1)
       Count.push_back( vacancy_[particle.x][particle.y][particle.z+1] );
-    }
   }
   else{
-    if (vacancy_[particle.x][particle.y][1] != -1 && periodic){
+    if (vacancy_[particle.x][particle.y][1] != -1 && periodic)
       Count.push_back( vacancy_[particle.x][particle.y][1] );
-    }
   }
 
   if (particle.z-1>0){
-    if (vacancy_[particle.x][particle.y][particle.z-1] != -1){
+    if (vacancy_[particle.x][particle.y][particle.z-1] != -1)
       Count.push_back( vacancy_[particle.x][particle.y][particle.z-1] );
-    }
   }
   else{
-    if (vacancy_[particle.x][particle.y][latticeZ_] != -1 && periodic){
+    if (vacancy_[particle.x][particle.y][latticeZ_] != -1 && periodic)
       Count.push_back( vacancy_[particle.x][particle.y][latticeZ_] );
-    }
   }
 }
-
 

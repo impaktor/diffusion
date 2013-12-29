@@ -1,11 +1,46 @@
 #ifndef SAVE_H
 #define SAVE_H
 
-//TODO: works without these, but would it be correct to exclude them?
 #include <vector>
 #include <string>
 
 class Save{
+public:
+  //Constructor. lowMem defaults to false, (bool lowMem=false)
+  // or else we can't use boostrap.
+  Save(std::vector<double> samplingTimeVector,
+       int noEnsembles, bool lowMem);
+
+  //Each single simulation run/trajectory/"ensemble" should be saved
+  //by calling this function. dx..dz is displacement from starting position.
+  void store(const std::vector<int>& dx, const std::vector<int>& dy,
+             const std::vector<int>& dz, const std::vector<double>& dr);
+
+  //After simulation is complete, call this to print an output-file by name
+  //"fileName" with structure:
+  //   [time]   [MSD]    [MSD_error]   [correlation]
+  //plus "head" which is just information about simulation parameters.
+  void save(std::string fileName, std::string head);
+
+  //To get P(x,t) i.e. a histogram, printed to file: "fileName_histogram"
+  //i.e. it appends "_histogram" to the given output file name.
+  void computeDistribution(std::string fileName);
+
+  //Add this after save() has run, to generate "numberOfRuns" synthetic
+  //output files with name: "outNameN" where N is {0 < N < (numberOfRuns-1)}
+  void computeBootstrap(std::string outName, int numberOfRuns,
+                        std::string head);
+
+  //compute correct error in the fitted parameter. Prints result to
+  //standard out (i.e. terminal, unless piped)
+  void computeJackknife(std::string outName);
+
+  //This is needed in the bootknife when we try fitting to many different
+  //starting times. (since we want t*k_t to be a constant, we need to know k_t)
+  void setJumprate(double);
+
+
+
 private:
 
   //average of displacement (MSD) squared: <X^2>, <Y^2>,...
@@ -18,7 +53,7 @@ private:
   std::vector<double> dr4_err_, dx4_err_, dy4_err_, dz4_err_;
 
   //Switch between the two stdErr-functions above.
-  bool lowMem_;
+  bool isLowMem_;
 
   //needed only for bootknifing over many different staring times
   //defined through the dimensionless quantity k_t * t.
@@ -35,6 +70,7 @@ private:
   std::vector< std::vector<int> > store_dz_;
   std::vector< std::vector<double> > store_dr_;
 
+  //Number of trajectories/simulation realizations.
   int noEnsembles_;
 
   //Number of elements in time vector (# of sampling points)
@@ -47,12 +83,16 @@ private:
   //times to compute the MSD. (x-axis)
   std::vector<double> samplingTime_;
 
-  //standard error
+  //standard error, to use as errorbars.
   void computeStdErr(void);
   void computeStdErrLowMem(void);
 
-  //compute pearson or H-matrix
-  void computeCorrelation(std::string name);
+  //These two functions generates a fourth column in the output-file.
+  void computeCorrelation();        //...either the "z" in Ht=z XXX...
+  void computePearsonCoefficient(); //...or the Pearson coefficient.
+
+
+
 
   void computeHmatrix(const std::vector<std::vector<double> >& trajectories,
                       const std::vector<double>& msd,
@@ -61,12 +101,6 @@ private:
   //print H-matrix to file, append "_matrix" to file name
   void printHmatrix(const std::vector<std::vector<double> >& matrix,
                     std::string name);
-
-
-  //function needed for computeJackknife():
-  inline void computeSlope(const std::vector<double>& msd,
-                           const std::vector<double>& sigma,
-                           double& mu);
 
   inline void computeSlope(const std::vector<double>& msd,
                            const std::vector<double>& sigma,
@@ -99,39 +133,6 @@ private:
   inline void computeError(const std::vector<std::vector<double> >& store,
                            const std::vector<double>& msd,
                            std::vector<double>& sigma);
-
-public:
-  //Constructor. (lowMem defaults to false, (bool lowMem=false))
-  Save(std::vector<double> samplingTimeVector,
-       int noEnsembles, bool lowMem);
-
-  //Each single simulation run/trajectory/"ensemble" should be saved
-  // by calling this function. (using reference for speed)
-  void store(const std::vector<int>& dx, const std::vector<int>& dy,
-             const std::vector<int>& dz, const std::vector<double>& dr);
-
-  //After simulation is complete, call this to print an output-file by name
-  //"fileName" with structure:
-  //   head-head-head-head-head-head-head-head
-  //   [time]   [MSD]    [MSD_error]   [correlation]
-  //where "head" is simulation info string to be stored with data in file.
-  void save(std::string fileName, std::string head);
-
-  //To get P(x,t) i.e. a histogram, printed to file: "fileName_histogram"
-  //i.e. it automatically appends a "_histogram" to given output file name.
-  void saveBinning(std::string fileName);
-
-  //Add this after save() has run, to generate "numberOfRuns" synthetic
-  //output files with name: "outNameN" where N is {0 < N < (numberOfRuns-1)}
-  void computeBootstrap(std::string outName, int numberOfRuns,
-                        std::string head);
-
-  //compute correct error in the fitted parameter. Prints result to
-  //standard out (i.e. terminal, unless piped)
-  void computeJackknife(std::string outName);
-
-  //see comment on k_t_ variable above.
-  void setJumprate(double);
 
 };
 

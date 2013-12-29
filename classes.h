@@ -1,7 +1,6 @@
 #ifndef CLASSES_H
 #define CLASSES_H
 
-//#include <iostream>        //for cout, among others
 #include <time.h>
 
 //First three classes (Direction, Jump, Particle), will allow us to
@@ -10,7 +9,7 @@
 
 class Direction{
 public:
-  Direction(double right, double left);
+  Direction(const double right,const double left);
   Direction(const Direction&);            //copy constructor
   Direction(void);                        //empty constructor
   double r;  //right
@@ -26,7 +25,7 @@ public:
 
 class Particle{
 public:
-  Particle(int,int,int);  
+  Particle(const int, const int, const int);  
   Particle(const Particle&);              //copy constructor
   Particle(void);                         //empty constructor
   int x;                                  //position x
@@ -51,9 +50,6 @@ public:
   Particle & operator=(const Particle &);
 
 };
-
-
-
 
 
 //Class to show runtime information, such as remainging time

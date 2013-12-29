@@ -6,8 +6,8 @@
 
 struct Fitab {
 	Int ndata;
-	Doub a, b, siga, sigb, chi2, q, sigdat;
 	VecDoub_I &x, &y, &sig;
+	Doub a, b, siga, sigb, chi2, q, sigdat;
 
 	Fitab(VecDoub_I &xx, VecDoub_I &yy, VecDoub_I &ssig)
 	: ndata(xx.size()), x(xx), y(yy), sig(ssig), chi2(0.), q(1.), sigdat(0.)  {

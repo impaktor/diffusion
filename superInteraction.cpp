@@ -2,23 +2,18 @@
 #include <cstdlib>         //för abort()-funktionen.
 #include <vector>          //för vektorklassen
 #include <cmath>           //för pow-, sqrt-funktionerna
+#include <cassert>         //for all asserts()
 
 #include "auxiliary.h"
 #include "superInteraction.h"
-
-#define VERBOSE 0;
+#include "global.h"
 
 using namespace std;
 
-//TODO: fixa in en random-generator i konstruktorn och använd denna när jag
-//behöver random number, genom användning av pekare tror jag.
-
 //NOTE: This code will not work for fixed boundary (yet).
 
-//have the constructor for the SuperInteraction-class initiate the constructor
+//constructor for the SuperInteraction-class initiate the constructor
 //of the lattice-class:
-
-
 SuperInteraction::SuperInteraction(int xSquare,int ySquare,int zSquare,
                                    int particleNumber, double seed,
                                    bool boundary,float interaction)
@@ -29,14 +24,12 @@ SuperInteraction::SuperInteraction(int xSquare,int ySquare,int zSquare,
 
 }
 
-void SuperInteraction::setInteraction(float interaction){
+void SuperInteraction::setInteraction(float interaction) const{
   //override the lattice-version, since using that version
   //would be fatal. This one doesn't do anything, other than
   //overriding the former.
-  cout << "Not using setInteraction()-function"
+  cerr << "Not using setInteraction()-function"
        << "interaction strength is set in constructor" << endl;
-  //interactionStrength_ = interaction;
-
 }
 
 
@@ -53,7 +46,7 @@ void SuperInteraction::printPositionToScreen(vector<int> particle){
   //Print position of particle label (int), or vector
   //containing particle labels, to screen. (Test-function)
   int m;
-  for(int i=0; i < particle.size(); i++){
+  for(size_t i = 0; i < particle.size(); i++){
     m = particle[i];
     cout << "Particle " << m << " X:Y:Z " << pos_[m] << endl;
   }
@@ -80,13 +73,7 @@ void SuperInteraction::controlVacancyCheck3(int n){
 
 
 
-
-
-
-
-
-
-inline double SuperInteraction::sumFrictionCoefficient(vector<int> cluster){
+double SuperInteraction::sumFrictionCoefficient(vector<int> cluster) const{
   //Function to sum the friction coefficients (inverse jump rate) of
   //all particles in the cluster.
 
@@ -95,23 +82,23 @@ inline double SuperInteraction::sumFrictionCoefficient(vector<int> cluster){
 
   for (int i = 0; i < vectorLength; i++){
       int m = cluster[i]; //gives correct particle-labels
-      sum = sum + 1.0/jumpRate_[m].x.r;
-      sum = sum + 1.0/jumpRate_[m].x.l;
+      sum += 1.0/jumpRate_[m].x.r;
+      sum += 1.0/jumpRate_[m].x.l;
   }
 
   if(dim_ >= 2){
     for (int i = 0; i < vectorLength; i++){
       int m = cluster[i]; //gives correct particle-labels
-      sum = sum + 1.0/jumpRate_[m].y.r;
-      sum = sum + 1.0/jumpRate_[m].y.l;
+      sum += 1.0/jumpRate_[m].y.r;
+      sum += 1.0/jumpRate_[m].y.l;
     }
   }
 
   if(dim_ == 3){
     for (int i = 0; i < vectorLength; i++){
       int m = cluster[i]; //gives correct particle-labels
-      sum = sum + 1.0/jumpRate_[m].z.l;
-      sum = sum + 1.0/jumpRate_[m].z.r;
+      sum += 1.0/jumpRate_[m].z.l;
+      sum += 1.0/jumpRate_[m].z.r;
     }
   }
 
@@ -119,7 +106,7 @@ inline double SuperInteraction::sumFrictionCoefficient(vector<int> cluster){
 }
 
 
-inline double SuperInteraction::sumFrictionCoefficient(int particle){
+double SuperInteraction::sumFrictionCoefficient(int particle) const{
   //Function to sum the friction coefficients (inverse jump rate) of
   //all particles in the cluster.
 
@@ -129,21 +116,21 @@ inline double SuperInteraction::sumFrictionCoefficient(int particle){
 
   //(Don't actually need the for-loop when just one single particle)
   for (int i = 0; i < vectorLength; i++){
-    sum = sum + 1.0/jumpRate_[m].x.r;
-    sum = sum + 1.0/jumpRate_[m].x.l;
+    sum += 1.0/jumpRate_[m].x.r;
+    sum += 1.0/jumpRate_[m].x.l;
   }
 
   if(dim_ >= 2){
     for (int i = 0; i < vectorLength; i++){
-      sum = sum + 1.0/jumpRate_[m].y.r;
-      sum = sum + 1.0/jumpRate_[m].y.l;
+      sum += 1.0/jumpRate_[m].y.r;
+      sum += 1.0/jumpRate_[m].y.l;
     }
   }
 
   if(dim_ == 3){
     for (int i = 0; i < vectorLength; i++){
-      sum = sum + 1.0/jumpRate_[m].z.l;
-      sum = sum + 1.0/jumpRate_[m].z.r;
+      sum += 1.0/jumpRate_[m].z.l;
+      sum += 1.0/jumpRate_[m].z.r;
     }
   }
 
@@ -180,46 +167,22 @@ void SuperInteraction::superInteractionCode(int n, int direction){
       if(dim_ == 3) cout <<", "<< pos_[i].z; cout << endl;
     }
     cout << endl;
-
-    //TEST
-    //the purpose is just to give each run a unique label,
-    //it helps when debugging.
-    double Test_Random_number;
-    Test_Random_number = randomNumber.doub();
-    cout << "random label for this run: "
-         << (double) Test_Random_number << endl;
-
-    if(Test_Random_number <= 0.883078 && Test_Random_number >= 0.883076) {
-      cout << "Bug number 2";
-    }
-
-    if(Test_Random_number <= 0.127939 && Test_Random_number >= 0.127935) {
-      cout << "Bug number 3";
-    }
-
-    if(Test_Random_number <= 0.842700 && Test_Random_number >= 0.842690) {
-      cout << "Bug number 4";
-
-    }
-
   }
 
-  checkVacancyMatrix(0.10);
+  assert(checkVacancyMatrix());
 
-  vector<int> cluster;              //store number of particles in Cluster here.
+  vector<int> cluster;       //store number of particles in Cluster here.
   countNeighbours(pos_[n], cluster);
   double V = interactionStrength_;  //interaction energy /(k_B*T) (V > 0)
 
-  double randomNum;
-
-  if (cluster.size() == 0){ //TODO change to empty()
+  if (cluster.empty()){
     //accept move
     vacancy_[pos_[n].x][pos_[n].y][pos_[n].z] = -1; //set as vacant
     moveAndBoundaryCheck(n,direction);           //move
     controlVacancyCheck3(n);                     //TEST that vacancy(n)..=-1
     vacancy_[pos_[n].x][pos_[n].y][pos_[n].z] = n;  //new position occupied
 
-    checkVacancyMatrix(0.11);
+    assert(checkVacancyMatrix());
 
     if(verbose){
       cout << "Moved single particle (no cluster/neighbors) n to " << endl;
@@ -236,17 +199,16 @@ void SuperInteraction::superInteractionCode(int n, int direction){
     //    Cluster.push_back(n);
     //    Gör detta i BuildCluster2() istället
 
-    checkVacancyMatrix(5874);  //TEST OK
+    assert(checkVacancyMatrix());
     buildCluster2(n,cluster,V);
 
     //TEST---------
-    bool testinglite = true;
-    for(int i = 0; i < cluster.size(); i++){
+    bool found_n = false;
+    for(size_t i = 0; i < cluster.size(); i++){
       if (cluster[i] == n)
-        testinglite = false;
+        found_n = true;
     }
-    if(testinglite)
-      printError("n not part of Cluster!", __FILE__, __LINE__);
+    assert(found_n);
     //-------------
 
 
@@ -258,17 +220,15 @@ void SuperInteraction::superInteractionCode(int n, int direction){
 
     //Calculate the friction constant (k^(-1))
 
-
     double sumCluster =  sumFrictionCoefficient(cluster);
     double sumParticle =  sumFrictionCoefficient(n);
 
-    testinglite = true; //TEST
-    for(int i = 0; i < cluster.size(); i++){
+    found_n = false; //TEST
+    for(size_t i = 0; i < cluster.size(); i++){
       if (cluster[i] == n)
-        testinglite = false;
+        found_n = true;
     }
-    if(testinglite)
-      printError("n not part of Cluster!", __FILE__, __LINE__);
+    assert(found_n);
 
     double P = sumParticle / ( sumCluster );
     //Note, sumParticle is part of sumCluster, since n is part
@@ -287,22 +247,22 @@ void SuperInteraction::superInteractionCode(int n, int direction){
       //Don't move the cluster if (P<r):
       //Nothing needs to be done, vacancy-matrix unchanged. If
       //cluster.size()=1, then P=1, and we will always move the particle.
-      if(verbose) cout << "Cluster to heavy, particle "
-                       << n <<" stays" << endl << endl;
+      if(verbose)
+        cout << "Cluster to heavy, particle " << n <<" stays \n" << endl;
     }
     else{
       //move whole Cluster.
 
       if(verbose) cout << "Move the whole cluster, does it collide? ";
 
-      checkVacancyMatrix(645601);
+      assert(checkVacancyMatrix());
 
       //We do a trial-and-error move with the whole cluster, since
       //it's the easiest way to check for obstructions/crowders.
       //store the old positions, temporarily:
       vector<int> XoldCluster, YoldCluster, ZoldCluster;
       //TODO: make this use the Particle class beauty...
-      for (int i = 0; i < cluster.size(); i++){
+      for (size_t i = 0; i < cluster.size(); i++){
         int c = cluster[i];
         XoldCluster.push_back(pos_[c].x);
         YoldCluster.push_back(pos_[c].y);
@@ -320,11 +280,9 @@ void SuperInteraction::superInteractionCode(int n, int direction){
       //Exclude their old coordinates from the vacancy-matrix.
       //(this is already done by setting them as vacant)
 
-      //checkVacancyMatrix(680001); aborts here, as it should
-
       vector<int> blocking;
       bool occupied = false;
-      for (int i = 0; i < cluster.size(); i++){
+      for (size_t i = 0; i < cluster.size(); i++){
         int c = cluster[i];
         int particleLabelOnNewSite = vacancy_[pos_[c].x][pos_[c].y][pos_[c].z];
 
@@ -338,8 +296,8 @@ void SuperInteraction::superInteractionCode(int n, int direction){
       }
 
       //TEST
-      for (int i = 0; i < blocking.size(); i++ ){
-        for (int j = 0; j < cluster.size(); j++ ){
+      for (size_t i = 0; i < blocking.size(); i++ ){
+        for (size_t j = 0; j < cluster.size(); j++ ){
           if(cluster[j] == blocking[i])
             printError("Same particle in both vectors!",__LINE__);
         }
@@ -356,7 +314,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
         if(blocking.size() != 0)
           printError("Blocking-vector should have zero length.");
 
-        for (int i = 0; i < cluster.size(); i++){
+        for (size_t i = 0; i < cluster.size(); i++){
           int c = cluster[i];
           //Now all particles in cluster[] have new positions, including n
           vacancy_[pos_[c].x][pos_[c].y][pos_[c].z] = c;
@@ -368,12 +326,11 @@ void SuperInteraction::superInteractionCode(int n, int direction){
           cout << endl;
         }
 
-        checkVacancyMatrix(35648);
+        assert(checkVacancyMatrix());
 
       }
       else{ //Ouch, our cluster is colliding with some shit...
-        //TODO: tänk på att vacancy är rätt märklig nu, med XoldCluster == -1 osv...
-
+        //NOTE/TODO: vacancy is a bit strange now, with XoldCluster == -1 etc.
 
         //this is an addition made in July:
         //For fucks sake! I need to restore the vacancy-matrix
@@ -381,7 +338,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
         //depends on it being correct!
         //Reset the "trial-and-error" move (for now), ie.
         //move the cluster back! Pronto!
-        for(int i = 0; i < cluster.size(); i++){
+        for(size_t i = 0; i < cluster.size(); i++){
           int c = cluster[i];
           pos_[c].x = XoldCluster[i];
           pos_[c].y = YoldCluster[i];
@@ -389,21 +346,18 @@ void SuperInteraction::superInteractionCode(int n, int direction){
 
           vacancy_[pos_[c].x][pos_[c].y][pos_[c].z] = c;
         }
-        checkVacancyMatrix(9080); //This must be correct now!
-        //End of July addition (but must compensate for this further
+        assert(checkVacancyMatrix());
+        //End of July 2010 addition (but must compensate for this further
         //down when we actually move)
         //NOTE: With the trial-and-error, we got what we wanted, namely
         //the Blocking[]-vector
 
-
-        if(blocking.empty()) //TEST
-          printError("Blocking[] should not have zero length",__LINE__);
-
+        assert(!blocking.empty());
+          
         //Construct a vector that contains all path blocking particles.
         buildBlockingCluster(blocking,cluster,direction);
 
-        if(blocking.empty())
-          printError("Blocking[] should not have zero length",__LINE__);
+        assert(!blocking.empty());
 
         if(verbose){
           cout << "The blocking cluster is:" << endl;
@@ -433,37 +387,35 @@ void SuperInteraction::superInteractionCode(int n, int direction){
             and have the vacancy-matrix be correct!
           */
 
-          checkVacancyMatrix(111156);
-
-          if(blocking.empty())//TEST
-            printError("Blocking[] should not have zero length.",__LINE__);
+          assert(checkVacancyMatrix());
+          assert(!blocking.empty());    //should not be empty
 
           //Set all old positions as vacant:
-          for (int i = 0; i < blocking.size(); i++){
+          for (size_t i = 0; i < blocking.size(); i++){
             int b = blocking[i];
             vacancy_[pos_[b].x][pos_[b].y][pos_[b].z] = -1;
           }
-          for (int i = 0; i < cluster.size(); i++){
+          for (size_t i = 0; i < cluster.size(); i++){
             int c = cluster[i];
             vacancy_[pos_[c].x][pos_[c].y][pos_[c].z] = -1;
           }
 
           //Move all particles, to get new positions in pos_[].x ...
-          for (int i = 0; i < blocking.size(); i++){
+          for (size_t i = 0; i < blocking.size(); i++){
             int b = blocking[i];
             moveAndBoundaryCheck(b,direction);
           }
-          for (int i = 0; i < cluster.size(); i++){
+          for (size_t i = 0; i < cluster.size(); i++){
             int c = cluster[i];
             moveAndBoundaryCheck(c,direction);
           }
 
           //Update the vacancy-matrix
-          for (int i = 0; i < blocking.size(); i++){
+          for (size_t i = 0; i < blocking.size(); i++){
             int b = blocking[i];
             vacancy_[pos_[b].x][pos_[b].y][pos_[b].z] = b;
           }
-          for (int i = 0; i < cluster.size(); i++){
+          for (size_t i = 0; i < cluster.size(); i++){
             int c = cluster[i];
             vacancy_[pos_[c].x][pos_[c].y][pos_[c].z] = c;
           }
@@ -476,8 +428,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
             printPositionToScreen(cluster);
             cout << endl;
           }
-
-          checkVacancyMatrix(32229);
+          assert(checkVacancyMatrix());
         }
         else{
           //Move everything back, update vacancy Matrix.
@@ -503,20 +454,15 @@ void SuperInteraction::superInteractionCode(int n, int direction){
             printPositionToScreen(cluster);
             cout << endl;
           }
-
-          checkVacancyMatrix(0.39);
-
+          assert(checkVacancyMatrix());
         }
-        checkVacancyMatrix(0.40);
-
+        assert(checkVacancyMatrix());
       }//END -- colliding Cluster
-      checkVacancyMatrix(0.41);
-
+      assert(checkVacancyMatrix());
     }//if move whole cluster-END.
-    checkVacancyMatrix(0.42);
-
+    assert(checkVacancyMatrix());
   }//if nearestNeighbor != 0 END
-  checkVacancyMatrix(0.43);
+  assert(checkVacancyMatrix());
 }
 
 
@@ -711,8 +657,8 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
 
   //TEST to see if Cluster and BuildBlockingVector contains the same particles
   //if so --> check that vacancy matrix hasn't be (incorrectly) changed
-  for (int i=0; i < BuildBlockingVector.size(); i++ ){
-    for (int j=0; j < Cluster.size(); j++ ){
+  for (size_t i=0; i < BuildBlockingVector.size(); i++ ){
+    for (size_t j=0; j < Cluster.size(); j++ ){
       if(Cluster[j] == BuildBlockingVector[i])
         printError("Same particle in both vectors!");
     }
@@ -723,8 +669,7 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
   int Min, Max;  //these are given as references in the func. below:
   calculateExtent(Cluster, direction, Min, Max);
 
-  //TEST:
-  checkVacancyMatrix(39103);
+  assert(checkVacancyMatrix());
 
   if(dim_ == 3)
     printError("BuildBlockingCluster does not work in 3D (yet)");
@@ -745,19 +690,19 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
       //iteration, but only loop over the old particles ( i.e. i < limit)
     }
 
-    for(int j = 0; j < BuildBlockingVector.size(); j++){
+    for(size_t j = 0; j < BuildBlockingVector.size(); j++){
       bool SingleValued = true;
       int b = BuildBlockingVector[j];
 
       //Check if it's stored in unique[] already:
-      for(int k = 0; k < unique.size(); k++){
+      for(size_t k = 0; k < unique.size(); k++){
         if (b == unique[k])
           SingleValued = false;
         //NOTE: Never enters this loop on the first run (unique.size=0)
       }
       //Check that particle s is not part of "Cluster"
       if(SingleValued){ //no need to run it if it's already "false"
-        for(int i = 0; i < Cluster.size(); i++){
+        for(size_t i = 0; i < Cluster.size(); i++){
           if(b == Cluster[i])
             SingleValued = false;
         }
@@ -889,8 +834,8 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
 
   //TEST to see if Cluster and BuildBlockingVector contains the same particles
   //if so --> check that vacancy matrix hasn't be (incorrectly) changed
-  for (int i=0; i < BuildBlockingVector.size(); i++ ){
-    for (int j=0; j < Cluster.size(); j++ ){
+  for (size_t i = 0; i < BuildBlockingVector.size(); i++ ){
+    for (size_t j = 0; j < Cluster.size(); j++ ){
       if(Cluster[j]==BuildBlockingVector[i])
         printError("Same particle in both vectors (err. location: 2)");
     }
@@ -916,7 +861,6 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
   //n included with 100 % probability:
   unique.push_back(n);
 
-  bool testinglite;  //test-variable to find potential errors in the code
   bool CheckAgain;   //true if a new particle was added to the cluster
 
   do{
@@ -930,11 +874,11 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
       //iteration, but only loop over the first initial set (ie. i < limit)
     }
 
-    for(int j=0; j < BuildClusterVector.size(); j++){
+    for(size_t j = 0; j < BuildClusterVector.size(); j++){
       bool SingleValued = true;
 
       //Check if it's stored in unique[] already:
-      for(int k=0; k < unique.size(); k++){
+      for(size_t k = 0; k < unique.size(); k++){
         if (BuildClusterVector[j] == unique[k])
           SingleValued = false;
       }
@@ -961,11 +905,11 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
   BuildClusterVector = unique;
 
 
-  if(false){ //Inaktiverad just nu
+  if(false){ //deactivated for now
     //TEST:
     cout << "kollar Nearest Neighbour.size(): "
          << BuildClusterVector.size() << endl;
-    for(int j=0; j < BuildClusterVector.size(); j++){
+    for(size_t j = 0; j < BuildClusterVector.size(); j++){
       int m= BuildClusterVector[j];
       cout <<"m = " << m << " (" << pos_[m] << ")" << endl;
     }
@@ -979,8 +923,8 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
 
   //TEST---------(To check for double counting)
   bool IsUniqueTrue = true;
-  for(int i = 0; i < unique.size(); i++){
-    for(int j = 0; j < unique.size(); j++){
+  for(size_t i = 0; i < unique.size(); i++){
+    for(size_t j = 0; j < unique.size(); j++){
       if (unique[i] == unique[j] && i != j)
         IsUniqueTrue = false;
     }
@@ -993,7 +937,7 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
 
 
 
-void  SuperInteraction::moveAndBoundaryCheck(int n, int R){
+void SuperInteraction::moveAndBoundaryCheck(int n, int R){
   //Overriding the default version, since I don't want the
   //vacancy check in this one. (cant do trial and error with
   //entire clusters unless I do this overriding.)
@@ -1015,37 +959,35 @@ void  SuperInteraction::moveAndBoundaryCheck(int n, int R){
 
     if ( R >= 0 && R < 6 ){
       switch(R){
-      case 0: pos_[n].x=pos_[n].x +1;
-        if (pos_[n].x == latticeX_ +1 && boundary == 0) pos_[n].x = 1;
-        if (pos_[n].x == latticeX_ +1 && boundary == 1) pos_[n].x = old.x;
+      case 0: pos_[n].x=pos_[n].x + 1;
+        if (pos_[n].x == latticeX_ +1)
+          pos_[n].x = boundary ? old.x : 1;
         break;
-      case 1: pos_[n].x = pos_[n].x -1; //move particle n to the left
-        if (pos_[n].x == 0 && boundary == 0) pos_[n].x = latticeX_;//periodic
-        if (pos_[n].x == 0 && boundary == 1) pos_[n].x = old.x;//fix
+      case 1: pos_[n].x = pos_[n].x - 1; //move particle n to the left
+        if (pos_[n].x == 0)
+          pos_[n].x =  boundary ? old.x : latticeX_;   //fix : priodic
         break;  //(first coordinate is 1, 0=outside)
-      case 2: pos_[n].y = pos_[n].y +1;
-        if (pos_[n].y == latticeY_ +1 && boundary == 0) pos_[n].y = 1;
-        if (pos_[n].y == latticeY_ +1 && boundary == 1) pos_[n].y = old.y;
+      case 2: pos_[n].y = pos_[n].y + 1;
+        if (pos_[n].y == latticeY_ +1)
+          pos_[n].y = boundary ? old.y : 1;
         break;
-      case 3: pos_[n].y = pos_[n].y -1;
-        if (pos_[n].y == 0 && boundary == 0) pos_[n].y = latticeY_;
-        if (pos_[n].y == 0 && boundary == 1) pos_[n].y = old.y;
+      case 3: pos_[n].y = pos_[n].y - 1;
+        if (pos_[n].y == 0)
+          pos_[n].y = boundary ? old.y : latticeY_;
         break;
-      case 4: pos_[n].z = pos_[n].z +1;
-        if (pos_[n].z == latticeZ_+1 && boundary == 0) pos_[n].z = 1;
-        if (pos_[n].z == latticeZ_+1 && boundary == 1) pos_[n].z = old.z;
+      case 4: pos_[n].z = pos_[n].z + 1;
+        if (pos_[n].z == latticeZ_+1)
+          pos_[n].z = boundary ? old.z : 1;
         break;
       case 5: pos_[n].z = pos_[n].z-1;
-        if (pos_[n].z == 0 && boundary == 0) pos_[n].z = latticeZ_;
-        if (pos_[n].z == 0 && boundary == 1) pos_[n].z = old.z;
+        if (pos_[n].z == 0)
+          pos_[n].z = boundary ? old.z : latticeZ_;
         break;
       }
 
       //THIS IS THE DIFFERENCE BETWEEN THE SUPER INTERACTION CODE:
       //(I cant have vacancy check here:)
-      //vacancyCheckOld(n,temp);  //Old code (slow)
-      //vacancyCheck(n,old);        //New improved, faster version.
-
+      //vacancyCheck(n,old);
     }
     else{
       cout << "There is a maximum of " << 2 * dim_
@@ -1059,9 +1001,6 @@ void  SuperInteraction::moveAndBoundaryCheck(int n, int R){
     abort();
   }
 }
-
-
-
 
 
 
@@ -1115,8 +1054,7 @@ void SuperInteraction::move(){
     if (partialSum_.empty())
       printError("Partial-sum vector has not been initiated");
 
-
-    double r2;          //store random number here
+    double r2;                          //store random number here
 
     int mu_guess;                       // must be integer. (index of vector)
     int mu_left = 0;
@@ -1129,7 +1067,7 @@ void SuperInteraction::move(){
     }while( r2 == 1 || r2 == 0 );
 
     double p_rand = (double) r2*partialSum_.back();
-    bool LoopAgain = true;
+    bool loopAgain = true;
 
     //NOTE: when comparing a long double against a double, C++ will fill
     //in the blanks with zeroes. Every 10^15 run of move() will lead to
@@ -1146,7 +1084,7 @@ void SuperInteraction::move(){
 
       if ((double) partialSum_[mu_guess] <= p_rand && p_rand <
           (double) partialSum_[mu_guess+1])
-        LoopAgain = false;
+        loopAgain = false;
 
       else{
         if (p_rand < (double) partialSum_[mu_guess]){
@@ -1158,11 +1096,10 @@ void SuperInteraction::move(){
           p_left = partialSum_[mu_guess+1];
         }
       }
-    }while(LoopAgain);
+    }while(loopAgain);
 
     int mu = mu_guess;
     int n,r;
-
 
     //transforms the index mu to which particle to move
     //(index n, by reference) and in which direction,by returning

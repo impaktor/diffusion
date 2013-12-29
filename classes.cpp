@@ -6,7 +6,7 @@
 #include "classes.h"
 
 
-Direction::Direction(double right, double left){
+Direction::Direction(const double right,const double left){
     r = right;
     l = left;
 }
@@ -19,7 +19,7 @@ Direction::Direction(void) : r(0.0), l(0.0) {
 
 
 
-Particle::Particle(int X, int Y, int Z){
+Particle::Particle(const int X, const int Y,const int Z){
   x = X;
   y = Y;
   z = Z;
@@ -56,20 +56,13 @@ std::ostream& operator<< (std::ostream &out, Particle &particle){
 
 //overloading the >> operator for the Particle class.
 //Note: don't actually use this, just for the sake of symmetry:
-std::istream& operator<< (std::istream &in, Particle &particle){
+std::istream& operator>> (std::istream &in, Particle &particle){
   //usage: Entering "54 67 42" will store to the class object.
   in >> particle.x;
   in >> particle.y;
   in >> particle.z;
   return in;
 }
-
-
-
-
-
-
-
 
 
 
