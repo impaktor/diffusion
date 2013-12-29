@@ -2,6 +2,7 @@
 #define SUPERINTERACTION_H
 
 #include <vector>
+#include <functional>      // for std::function
 #include "lattice.h"
 #include "classes.h"
 
@@ -15,7 +16,7 @@ private:
 
   //sum over many particles
   double sumFrictionCoefficient(std::vector<int>) const;
-  
+
   //sum over one particle
   double sumFrictionCoefficient(int) const;
 
@@ -38,6 +39,9 @@ public:
 
   //don't actually use this one, thus redefine it.
   void setInteraction(float) const;
+
+  //for easier threading:
+  void generateTrajectory(int& E);
 
 };
 

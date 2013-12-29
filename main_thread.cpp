@@ -23,9 +23,9 @@ const int DISTRIBUTION  = 3;           //0 = uniform, 1 = exponential,
 //                                      2 = power-law, 3 = nakazato
 const float JUMPRATE_TRACER = 1;       //default value
 const float JUMPRATE_CROWDER = 0.5;    //(if nakazato-distribution)
-const bool FIXBOUNDARY =      0;       //1=fix wall, 0=periodic boundary
-const bool EXPONENTAIL_WAITING_TIME = 1;
-const bool PRINT_HISTOGRAM = false;     //MSD-distribution to out.dat_histogram
+const bool FIXBOUNDARY =      true;    //1=fix wall, 0=periodic boundary
+const bool EXPONENTAIL_WAITING_TIME = true;
+const bool PRINT_HISTOGRAM = true;     //MSD-distribution to out.dat_histogram
 
 const double SEED_JUMP     = 17;       //usually: 17
 
@@ -59,9 +59,6 @@ int main(int argc, char* argv[]){
   //use nearest neighbor interaction, or bypass that algorithm.
   def.isInteracting = false;
 
-  //print simulation information to screen
-  def.isQuiet = false;
-
   //if  isInteracting = true, then use:
   def.interactionStrength = 0;
 
@@ -76,6 +73,9 @@ int main(int argc, char* argv[]){
 
   //is a char, use Bootstrap ('b') of Bruteforce ('B')?
   def.method = 'B';
+
+  //use Bootknife method?
+  def.isBootknife = false;
 
   //use jack knife method?
   def.isJackknife = false;
@@ -118,7 +118,7 @@ int main(int argc, char* argv[]){
     double timeSum = minTime; //start time
     for (int i = 0; i < nSamplings; i++){
       samplingTimes.push_back(timeSum);
-      timeSum = timeSum + deltaTime;
+      timeSum += deltaTime;
     }
   }
   else{
@@ -126,7 +126,7 @@ int main(int argc, char* argv[]){
     double deltaTimeLog = (double) log(maxTime)/nSamplings;
     double logTimeSum = log(1);
     while (logTimeSum < log(maxTime)){
-      logTimeSum = logTimeSum + deltaTimeLog;
+      logTimeSum += deltaTimeLog;
       samplingTimes.push_back( exp(logTimeSum) );
     }
   }
@@ -218,7 +218,7 @@ int main(int argc, char* argv[]){
     RemainingTime printToScreen(ensemble);
 
     for(int E = 0; E < ensemble;){ //E is iterated from the std::ref(E)
-      if (!def.isQuiet)  printToScreen.printProgress(E);
+      printToScreen.printProgress(E);
 
       //When not using threads: (could as well use crowd1.generateTrajectory(E))
       //-------------------
@@ -238,10 +238,10 @@ int main(int argc, char* argv[]){
       thrd3.join();
       thrd4.join();
 
-      //Store tracer position at each point for this "ensemble",
-      //needed by class to compute standard error/deviation. (+for
-      //binning, etc.)  extract displacement coordinates of the
-      //tracer...  store the current ensemble values in these:
+      //Store tracer position at each point for this "ensemble", needed by
+      //class to compute standard error/deviation. (+for binning, etc.)
+      //extract displacement coordinates of the tracer...
+      //store the current ensemble values in these:
       vector<int> dx,dy,dz;
       vector<double> dr;
 
@@ -287,17 +287,21 @@ int main(int argc, char* argv[]){
     save.save(def.outputFileName, head);
 
     //prints distribution, and saves to "outputFileName" + "_histogram"
-    if(printHistogram) save.computeDistribution(def.outputFileName);
+    if(printHistogram)
+      save.computeDistribution(def.outputFileName);
 
-    if(def.method == 'b' && !def.isLowMem){
-      //bootstrap the shit out of this. Note, the bootstrapped
-      //output files can be distinguished from the "real" simulation
-      //by them ending with a number i: {0 < i < (noOutFiles - 1)}
+    if(def.method == 'b')
+      //bootstrap the shit out of this. Note, the bootstrapped output
+      //files can be distinguished from the "real" simulation by them
+      //ending with a number i: {0 < i < (noOutFiles - 1)}
+      save.computeBootstrap(def.outputFileName, def.nOutputs,
+                            jumpRates[0].x.r, head);
 
-      save.setJumprate(jumpRates[0].x.r);
-
-      save.computeBootstrap(def.outputFileName, def.nOutputs, head);
-    }
+    if(def.isBootknife)
+      //If true, use the hybrid "bootknife" method to compute slope,
+      //and error, and write to separate file: "out.dat_bootknife"
+      save.computeBootknife(def.outputFileName, def.nBootknife,
+                            jumpRates[0].x.r, head);
 
     if(def.isJackknife && !def.isLowMem)
       save.computeJackknife(def.outputFileName);

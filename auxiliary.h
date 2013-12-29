@@ -4,66 +4,71 @@
 #include <string>
 
 //This file contains implementations that have nothing to do with
-//physics, such as printing messages, ask for input parameters, read
-//command arguments (flags), print error messages, ignore commented
-//lines, etc.
+//physics, such as reading command arguments (flags), print error
+//messages
 
 
-//container for the default simulations values.
-//modifiable by passing arguments on command line.
+
 struct InputValues{
+  //container for the default simulations values. Modifiable by
+  //passing arguments on command line. The first in each std::pair
+  //holds the value, and the second is whether it has been changed
+  //through the command line.
+
 public:
-  //use logarithmic spacing of sampling points
-  bool isLogScale;
 
-  //run in low memory mode
-  bool isLowMem;
+  std::pair<bool, bool> isLowMem;   //run in low memory mode
 
-  //use nearest neighbor interaction
-  bool isInteracting;
+  bool isInteracting;               //use nearest neighbor interaction
+  int interactionStrength;          //if isInteracting = true
 
-  //print simulation information to screen
-  bool isQuiet;
 
-  //if  isInteracting = true, then use:
-  int interactionStrength;
-
-  //save simulation output to files with this prefix
-  std::string outputFileName;
-
-  // file (path) to read i input values from
-  std::string inputFileName;
+  std::string outputFileName;   //save simulation output to files with this prefix
+  std::string inputFileName;    //file (path) to read i input values from
 
   //number of output files/MSD-trajectories.
   //Only valid for "bootstrap" or "Brute force"
   int nOutputs;
 
-  //use Bootstrap of Bruteforce?
-  char method;
+  bool isJackknife;   //use jackknife method?
+  char method;        //use Bootstrap of Bruteforce?
+  bool isBootknife;   //use Bootknife method?
 
-  //use jack knife method?
-  bool isJackknife;
+  //number of trajectories to generate when/if bootknifing. Cant use
+  //the "nOutputs"-variable, since that's for bootstrap and bruteforce
+  size_t nBootknife;
 
   //jumprate of tracer particle
-  float jmpTracer;
+  std::pair<float, bool> jmpTracer;
+
+  InputValues(){
+    isLowMem =            std::make_pair(false, false);
+    isInteracting =       false;
+    interactionStrength = 0;
+    outputFileName =      "out.dat";
+    inputFileName =       "input.ini";
+    nOutputs =            1;
+    method =              'B';
+    isBootknife =         false;
+    nBootknife =          1;    //what is this? XXX TODO
+    isJackknife =         false;
+    jmpTracer =           std::make_pair(1.0, false);
+  }
 };
 
 
-//only these functions needs to be accessible from the "outside",
-void argumentFlags(int, char**, InputValues& input);
+namespace aux{
+  void argumentFlags(int argc, char** argv, InputValues &in);
 
-//parameters to ask for during start (if no input-file was given)
-void askUserForInputParameters(int&,int&,int&,int&,int&,int&,double&);
+  bool convertToBool(const char * c, std::string);
 
-//get simulation parameters from input-file instead.
-bool readInputFile(std::string&,int&,int&,int&,int&,int&,int&,double&);
+  //Prints message, and aborts the program.
+  void printError(std::string message);
+  void printError(std::string message);
+  void printError(std::string message, int line);
+  void printError(std::string message, std::string file, int line);
 
-//Prints message, and aborts the program.
-void printError(std::string message);
-void printError(std::string message, int line);
-void printError(std::string message, std::string file, int line);
-
-//only used by AskUserForInputParameters():
-void printHelp(std::string, char**);
+  void printHelp(char**);
+}
 
 #endif

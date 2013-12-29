@@ -1,0 +1,662 @@
+#+STYLE: <link rel="stylesheet" type="text/css" href="eon.css" />
+#+TITLE: INSTRUCTIONS AND COMMENTS
+#+OPTIONS: author:nil
+
+# USAGE: Open in Emacs, use TAB to collapse/expand sections.
+
+* Getting started with the program
+  Upon execution, the program will ask for input parameters, if no
+  input-file was specified, (use the '-r' flag). Example:
+:  ./prog -w output.dat -r input.ini
+  See below for more options. (or do =./prog -h=)
+
+* Compiling and the Makefile
+#<<makefiles>>
+  If the file Makedep.rule does not exist, or any file has changed,
+  run "make depend". Then doing a simple "make" compiles it. Check the
+  header of the Makefile for options.  The Makefile can take a number
+  of different commands by running the following from the command
+  line:
+
+  - make :: Compile the binary "prog" from main.cpp, optimized, and
+            with all asserts() turned off, and threading (openMP)
+            turned on.
+
+
+  - make mode=debug :: Use this when debugging. Turns on all
+       assert()-statements, and compiles with debug-flags for gdb.
+
+
+  - make mode=serial :: Like normal =make= but without openMP.
+
+
+  - make mode=profile :: Use when compiling for gprof.
+
+
+  - make super :: Compile the binary "super" from =main_super.cpp= which
+                  is the "super interaction"-code, currently in testing
+                  stage.
+
+
+  - make clean :: Remove all binary and object files (*.o)
+
+
+  - make tar :: Create prog.tar.gz with all needed source files
+
+
+  - make zip :: Create prog.zip with all needed source files.
+
+
+  - make tags :: Create a Tags-file for Emacs. When cursor in Emacs is
+                 on a name use "M-." to jump to definition, and "M-*"
+                 to jump back.
+
+  - make lines :: Returns the total number of lines of code. ( :D )
+
+  The Makefile will recompile any files that have been changed and all
+  files that depend on it, thus speeding up the compilation, and
+  always making sure the binary is correctly linked. Running "make -j4
+  -k" compiles on 4 threads, and keeps going even when encountering
+  errors.
+
+* Running
+  For help on command flags and arguments just run the program with
+  the -h flag. For convenience they are given below:
+
+  * -h :: Displays usage and help.
+
+
+  * -m :: Use the (much) less memory consuming algorithm. Advisable if
+          (Number of values to store) x (number of ensembles) / 2^30 ~RAM
+          (in Gb)
+
+
+  * -i M :: The -i option activates the interaction-algorithm, with "M"
+            being the interaction strength. Note that M >= 0. If M = 0 the
+            simulation gives the same result as without, but it will run
+            slower.
+
+
+  * -w target :: Write simulation output to "target" instead of the default
+                 "out.dat" (can include a path and name up to 99 characters
+                 long).
+
+
+  * -r source :: Read an input-file instead of asking for simulation
+                 parameters.
+
+
+  * -B N :: Generate N different output-files with the same input
+            parameters, by using Brute force, i.e. Just rerun the
+            simulation N times.
+
+
+  * -b N :: Generate N different output-files (if =BOOTSTRAP_CONSERVE_MEMORY=
+            is true, else print a matrix) with the same input parameters,
+            by using bootstrap; after the simulation it generates N
+            synthetic output-files. NOTE: -B and -b are mutually exclusive,
+            can't use both.
+
+
+  * -k N :: Run N virtual simulations, and make a bootknife fitting to
+            MSD's.  Can not be used with the -m flag.
+
+
+  * -j :: Turn on the jackknife algorithm to print out a corrected error to
+          the screen and file appended with =_jackknife=. Can not be used
+          with -m flag.
+
+
+  * -t k :: Set the tracer jumprate to "k", where "k" is a float.
+
+* Output-files
+  The primary output-file, (default name is out.dat) has the following
+  columns (as of 2012-11):
+
+:    <time>  <dr^2>  <dr^2_error>  <pearson coef.>   <Z>
+
+  pearson coefficient measures correlation between data points, and Z is
+  the vector which fulfills H*z=t needed to compute the MSD (<dr^2>) and
+  error, and does not require us to save the entire H-matrix, even though
+  it does that now also as a bonus.
+
+* Getting started with the code
+  If the daunting task of reading the source code has been bestowed
+  upon you, I'd recommend limiting yourself to lattice.{h,cpp} and
+  main.cpp. The save.{h,cpp} does all post simulation data
+  processing. It saves all trajectories, and does a bunch of "nifty"
+  stuff with them. Understanding the definitions in classes.{h,cpp} is
+  crucial.
+
+* Running on many computers
+  use ssh:
+:  $ ssh -n 'cd /to/path; nice -19 ./prog -r input.ini'
+  Or:
+:  $ ssh -X nice -19 ./prog output.dat -r input.ini'
+  Use =che2= to find available computers.
+
+* Source files
+
+- Makefile :: Needed to compile the project. Contains description to
+              compile the binary *.o files, and on which files they depend
+              upon.
+
+
+- Makedep.rule :: Is created by running =make depend=, and will read all
+                  include- macros and contains which files depend on which.
+
+
+- main.cpp :: main function. Most of the code is for finding input
+              parameters, and setting the jumprate and sampling time
+              vector.
+
+
+- nr/ :: Folder where all the needed header files taken from Numerical
+         Recipes (W.Press). This can be replaced with a symbolic link to
+         the actual folder where all NR-files are located. (if not using
+         threads)
+
+
+- simpleini/ :: Folder for the SimpeIni files (2) to parse ini-files.
+
+
+- save.{h,cpp} :: Save routine. During simulation it stores the MSD for
+                  each individual /ensemble/ (trajectory), and then
+                  computes standard deviation, correlation, etc, and prints
+                  results to a file.
+
+
+- lattice.{h,cpp} :: This is where the physics happens.
+
+
+- classes.{h,cpp} :: Defines the Particle class which depends on Jump
+     class, which depends on the Direction class. (in use since version
+     8). Also has a nice class for printing time left on a simulation.
+
+
+- input.ini :: Example input file.
+
+
+- auxiliary.{h,cpp} :: Functions that reads in command line arguments
+     & flags and reads input files. Also has printError-functions, and
+     the print help-message (-h flag).
+
+* Hard-coded variables:
+  To not use winding number when using periodic boundary conditions,
+  check the commented code in =void Lattice::move()=. With the use of
+  winding numbers we keep track on how many times the tracer has
+  circled (jumped off) the lattice.
+
+  Generally, hard-coded variables are defined in the head of
+  =save.cpp=, and =lattice.cpp=.
+
+* Dimension
+  The program accurately accounts for all dimensions larger
+  than 1. This means that a lattice with size 100x100x0 or 100x100x1
+  is considered two dimensional lattice, and only moves in X and Y are
+  made. All particles still have a Z-coordinate, but no move will be
+  made in this direction as long as Z<2, or else we would "leak" some
+  probability/speed of the particles.
+
+* Jump-rates
+  The code allows for different jump rates in different directions,
+  although this has never been used.
+
+* Super-Interaction code                                           :noexport:
+  If running =./super -i N=, it will run the super interaction code
+  that builds clusters and allows them to collide with each
+  other. Threading does not work (I don't know why) and fixed boundary
+  does not work, since a cluster moving to the boundary, or moving
+  another cluster there will get squashed.
+
+  The code works (from what I can tell) and for a particle to move, it
+  will form a cluster with its neighbors (which in turn will bind to its
+  neighbors) making up a cluster. When moving this in say y = y + 1
+  direction it will note all particles in the way and form a cluster of
+  these (where all particles between =x_left= and =x_right=, of the
+  original cluster, are included) and move the old and new or do stay
+  (i.e. reject attempt to move) depending on the friction (sum of jump
+  rates) of the clusters.
+
+* Coding Conventions
+  The code follows the following rules:
+  (see [[http://geosoft.no/development/cppstyle.html]])
+
+| DESCRIPTION                | EXAMPLE                     |
+|----------------------------+-----------------------------|
+| All variables              | =camelCase=, =myVariable=   |
+| Constants                  | =MY_CONSTANT=               |
+| Private class variables    | =camelCase_=                |
+|                            |                             |
+| Types                      | CamelCase, MyType, Particle |
+| (always a noun, or is it?) | Direction, etc.             |
+|                            |                             |
+| Functions & methods:       | getVariable(), computeD(),  |
+| (always a verb, ...is it?) | setVariable()               |
+
+  - operators are preceded and followed by space, " == ", " + " etc.
+
+  - /Generic variables should have the same name as their type/
+
+  - Note: underscore =_= can be used in the standard LaTeX-sense: =pos_0= etc.
+
+  - use =int&= rather than =int &=
+
+* Additional speed
+  When running huge simulations one could try commenting some of the
+  testing if-statements that are there to find bugs. The most used
+  functions are:
+
+:  Lattice::moveAndBoundaryCheck
+:  Lattice::vacancyCheck
+:  Lattice::convertMuToParticle
+
+  Also it is a good idea to compile with =-D NDEBUG= (see Makeflile)
+  when running real (non-testing) simulations, as this disables any
+  asserts(). Also, if running a simulation for long time, such as is
+  needed for percolation, use lowMem = true. This saves a lot of RAM,
+  but unfortunately we can not use bootstrap since that needs all
+  individual trajectories after the simulation.
+
+  To save further memory use "short" instead of "int" in
+  vacancyCheck-matrix. Will cut memory usage in half, but an =int= is
+  faster to process than a =short=.
+
+* TODO Things left to do
+** TODO Boot{strap,knife} almost the same function, express as such.
+** TODO In =save::computeHmatrix3()=
+   - When I'm confident this works, remove =std::string filename= as
+     input to =computeHmatrix3()=.
+
+** TODO Makefile could print which mode is being compiled
+   See:
+   [[http://stackoverflow.com/questions/792217/simple-makefile-with-release-and-debug-builds-best-practices][ref1]], [[http://www.gnu.org/software/make/manual/make.html#Target%255F002dspecific][ref2]], or [[http://stackoverflow.com/questions/1079832/how-can-i-configure-my-makefile-for-debug-and-release-builds][ref3]]
+
+** TODO =Lattice::interaction= might not be thread safe!
+   I don't know how thread safe the random number generator used in
+   this function is. One can always compile the code in serial mode,
+   to disable the OpenMP instructions.
+
+* CHANGE LOG
+  ---------
+
+** version 13 BETA [2013-04-27]
+
+- removed the -l flag for log-spacing.
+
+- Using simpleini.h to parse the input file, which has gotten an
+  overhaul. More options can now be set in "input.ini" which now has
+  an ini-file format.
+
+- removed askUserForInputParameters, readInputFile, isComment from
+  auxiliary.{cpp,h}. Created an aux::namespace.
+
+
+** version 12 [2013-04-27]
+
+- README.txt now re-made into an org-mode file for Emacs. Easy
+  exporting to html, ASCI, and LaTeX.
+
+- Removed the possibility of outputing out.dat_txyz with the <x>, <y>
+  ... data. Only used for checking the code. Not needed anymore.
+
+- Made a class Vacancy to represent the =vacancy_= matrix, so that it
+  is easier to change the representation of our lattice, e.g. can now
+  easily change the vacancy-matrix to be a single vector (still same
+  number of elements as the matrix though), or have a hexagonal
+  matrix, etc. Made the changes needed in =superInteraction.cpp=, and
+  =lattice.cpp=, so that they only call the functions =isVacant=,
+  =setAsVacant= etc.
+
+- =store_dr_= now has the trajectories squared from the beginning, and
+  is now called =store_dr2_=. This saves me many
+  =pow(store_dr_[][],2)= calls.
+
+- restructured =computeHmatrix()=, now uses =computeVariance()= and
+  there's three different ways to compute this estimator:
+  =Save::computeHmatrix3()=, =Save::computeHmatrix2()= ...
+
+- implemented openMP as default threading environment, and removed
+  =save_thread.cpp=, and made necessary changes to Makefile.
+
+- [[Compiling%20and%20the%20Makefile][Makefile]] less cluttered and more readable, can now be run either in
+  default =make=, resulting in a optimized fast threaded/parallel
+  executable, or as: =make mode=debug=, =make mode=serial= (no
+  threading) or =make mode=profile=.
+
+- in some for-loops: replaced repeated division of =x= with
+  multiplication of =constant = 1/x=. Computers hate division. Faster!
+
+- removed fourth column in output file being either pearson coefficient or
+  z (in z = H^(-1)*t). Now pearson is always 4th column, and z always 5th;
+  if not computed these columns are just zeroes ([[Output-files][See documentation above]]).
+
+- columns in main output file now have headers describing what's what.
+
+- Renamed variables in =Lattice::computeErgodicity= from Swe --> Eng.
+
+- Fixed bug in =Lattice::computeEffectiveDiffusionConst= which would
+  have made a difference in =D_eff= if one were to use different jump
+  rates in different directions.
+
+- rewrote =Save::computeDistribution()=, now much less code, and added a
+ parameter at the top of save.cpp for setting resolution of histogram
+
+- removed ugly & unused "test of Gaussian distribution" from
+ =Save::computeStdErr()=, since we have a =Save::computeDistribution()=.
+
+- removed =using namespace std= from Lattice.{cpp,h}, use =std::= instead
+
+- removed small 2x2 sanity test matrix of conditional number in
+ =Save::computeZ()=.
+
+- removed pointless "quiet" option. Use =./prog > /dev/null= if one for
+  some reason don't want anything printed to standard out.
+
+- wrote =lomholt.py=, which uses correlation matrix to compute slope and
+  sigma, either from column 5 "z" or from h-matrix itself.
+
+- =Save::computeMean()= and =Save::computeMSD()= is now the same function.
+
+- now using alias in Save-class: =typedef std:vector<vector<double> >
+  matrixD_t=
+
+** version 11 2011-12
+   Finishing it up for Tobias:
+
+- use of ?-operator in moveAndBoundaryCheck(), and a bit less calls to
+ if-statements. (Only check for what boundary condition we have if
+ we're at the boundary).
+
+- redid the Makefile completely.
+
+- New c++ standard here! Includes threads from boost library,
+  i.e. =main_thread.cpp= no longer depends on the =boots_thread=
+  library!
+
+- introduced several functions as "const", to make it clear they don't
+ change any of the class member variables.
+
+- removed Lattice:buildCluster2(). I don't know what it did there?
+
+- made vacancy-matrix use int (again) as short is too small for big
+ systems.
+
+- removed some {} from one-line if-statements
+
+- inserted a number of assert() to not need the =__LINE__= macro (in
+  superInteraction).
+
+- minor correction to nr/fitab and nr/LUdecomp to remove compilation
+ warnings.
+
+- introduced the InputValues-struct to make the reading of command line
+ arg. easier.
+
+- restructured the computeCorrelation to two functions. One for Pearson
+ and one for z.
+
+- changed name of Save::saveBinning --> computeDistribution, and moved
+ it from save::save() to be called from main().
+
+- renamed numberOfRuns in Save::Bootsrap to noOfRuns.
+
+- removed out-commented code from Save::Bootstrap that let you run
+  dx:=(x - <x>) instead of dx:=(x - x_0).
+
+- removed Save::copmuteMSD() overloaded function that could treat x,y,z
+ separatley, which was needed when we wanted to check dx:=(x - <x>).
+
+- removed Bootknife code from Save::Bootstrap, and made it its own
+ function Save::Bootknife. Slightly inefficient, but more readable
+ code now. Used with the new -k flag.
+
+- removed Save::setJumprate() and =k_t_= from save-class, =k_t= now goes in
+ as an argument now to Save::Bootstrap() and Save::Bootknife(). Only
+ needed when experimenting with different starting times (since we
+ want =t*k_t= to be a constant).
+
+- updated =main_super=.
+
+- Now auxiliary::readInputfile also ignores empty lines. (bug squashed!)
+
+- discovered (and fixed) bug that caused secondary file (=out.dat_txyz=)
+  to be printed in low memory mode, when x_mu, y_mu, z_mu are empty.
+
+** version 10 2010
+- finally made my superInteraction-code compile. (note to self:
+ "inline" in base-class, not a good idea).
+
+- cleaning up code, removed a bunch of no longer used functions in
+ main.cpp, some of them are still defined in lattice.[h,cpp] though
+ for use again.
+
+- changed vacancy matrix from <int> (4 byte) to <short> (2 byte), only
+ uses half as much RAM!
+
+- added header to each column in =out.dat_txyz=-file.
+
+- significant recoding of auxiliary.cpp. Re-wrote getNonCommentInput
+ completely, and it now works, which it did not before.
+
+- added a '-r' flag for reading input files (with comments!), I bet
+ Tobias will be happy now...
+
+- added copy constructors to Particle:: and Direction:: (even though
+ I'm not using them), and made the void constructor initiate
+ everything to 0, for both Particle, Jump, and Direction - classes.
+
+- removed:
+    Lattice::vacancyCheckOld
+    Lattice::moveOlod
+    Lattice::snapshot,
+    Lattice::dumpSimulation,
+    Lattice::saveCluster & Lattice::printCluster (meant to print
+                        clustersize-distribution when using interaction),
+    TESTinteraction.cpp (removed entire file, old code. Not used.)
+
+- minor changes in Lattice:checkVacancyMatrix
+
+- removed 3 redundant =#include <...>= in =lattice.cpp=, and wrote an
+  =#ifndef= in =nr/ran_mod.h=.
+
+** version 9
+- implemented "winding-numbers", for use with periodic boundary. One
+ could have it as it is now, with a class-reachable winding-number for
+ just the tracer particle, alternatively one could add this to the
+ particle class, which would be less hassle, (no need to fiddle about
+ in Lattice::vacancyCheck), only in Lattice:MoveAndBoundaryCheck(),
+ but would require (slightly) more memory. To turn on/off, just
+ (un)/comment the (indicated) code in Lattice::Move.
+
+- (23/2 -11) To make the Lattice class be able to multi-thread, setting
+ the Ran class (NR 3 ed.) as "static" is not optimal, since we will
+ initiate several instances of the Lattice-class, and static reaches
+ across the class encapsulation and we don't know what happens if two
+ threads try to access the random number generator at the same
+ time. Therefore, we initiate a single non-static random number
+ generator in the class, that is only reachable for the members of
+ that instance of the class. We do this by using initialization list
+ in the class. This makes my simulation non-comparable with previous
+ simulations, since I now only use one seed for each Lattice class
+ instead of three (waiting time, place, and move).
+
+- Made the bootknife in save.cpp be able to make several fittings with
+ different starting times.
+
+- All previous simulations ever made had the exact same distribution of
+ crowders, i.e. "quenched", now I WILL/CAN change this [EDIT: first I
+ must get Nakazato to give reasonable results], and start by moving
+ the generation of jumprates to a separate function in the main()
+ function.
+
+- Added the 't' flag for setting the tracer jumprate, i.e. not needing
+ to compile 22 different binary files. Distribution, and nakazato
+ crowding rate (k_c) is still hard coded.
+
+- Made the save-class show remaining time when bootstrapping and
+ computing the H-matrix. This called for some minor changes in the
+ RemainingTime-class and also made the save-class depend on
+ classes.[cpp,h].
+
+- my super-interaction code from this summer was probably broken many
+ versions ago by modifications in various classes. Now it works, and
+ is renamed (main_super.cpp), and is directly based on main.cpp
+
+- Code now uses the Particle-class, which was implemented some time
+ between version 8 & 9.
+
+** version 8 (15/2 2011)
+- Renamed "prog.cpp" to more appropriate "main.cpp".
+
+- Made a threading version of main.cpp, called main_thread.cpp. It uses
+ the thread-package in the boost library. Increase in speed more than
+ two-fold.
+
+- Re-made the Makefile, now it is glorious.
+
+- Changed the search-function (slightly) in
+ Lattice::convertMuToParticle()
+
+- Moved all the save-routines to their own class, save.[h,cpp], and
+ compensated for it in main.cpp and superProg.cpp
+
+- Continued the renaming of variables according to mentioned convention
+ above. (dx -> dx_, etc.)
+
+- Removed all if-statements in main.cpp that allowed for using
+ Lattice::moveOld()-function. (I never use it)
+
+- Converted all "char*, char name[]" types to std::strings.
+
+- Output-files now stores which waiting time distribution was used.
+
+- Made the binning function in save.cpp work.
+
+- Added a bootstrapping function in the save-class, (with b flag)
+
+- Added a Jackknife function in the save-class, and a command flag
+ "-j".
+
+- Added a "hybrid" bootknife function in save::computeBootstrap. It is
+ hard coded and turned on/off by boolean at head of save.cpp.
+
+- Put an additional loop outside the ensemble loop, so now I can run
+ many simulations in a row (with the same parameters), to generate
+ numerous output-files, which I need to check the correlation between
+ sampling points. Also made two new command flags, b (use bootstrap),
+ and B (use Brute force), both requires one to specify the number of
+ re-runs.
+
+- Introduced two global variables in save.cpp, for easy hard coding
+ access to turn on/off of correlation function, and binning function.
+
+** version 7 (Nov 2010)
+
+   - Renamed and split up my main (singleton) class to "Lattice"
+     (lattice.[h,cpp])
+
+   - Made my TESTinteraction.cpp (generally called "super interaction")
+     into a class SuperInteraction, that inherits all the public and
+     protected methods/variables of the Lattice class. This makes it use
+     the same source code as the lattice class, plus some specific
+     functions. I'm keeping the old TESTinteraction.cpp for documentation,
+     since it is completely self- contained, (ie. everything in one source
+     file, except ran.h & nr3.h).
+
+   - Introduced the H-matrix and computeCorrelation-function, to compute
+     the correlation between sampling points, and use an H-matrix that
+     automagically removes/compensates for correlation. (Work on this
+     continues in the next version, as it is not 100% complete)
+
+   - Use of svd.h evaluates the error in H-matrix due to floating point.
+
+   - made setSamplingTime take an additional optional argument for
+     exponential waiting time.
+
+   - Moved all the numerical recipes codes to their own folder.
+
+   - The three main Seeds will now be set through define-macros.
+
+** version 6
+   NOTE: from this version forward the output is not comparable to previous
+   simulations, by use of the "diff"-command, since I now have a new
+   algorithm to set the sampling times! The simulation result is still the
+   same, physically, but not truly identical.
+
+   - Changed the calculation of average diffusion constant to omit the
+     tracer particle.
+
+   - Activated the LowMem command flag ('-m')
+
+   - Resolved the spaghetti that was my sampling time code. In doing so,
+     removed get_{[dx,dy,dz,dr]}, set_dt, etc, and other garbage
+
+   - Renamed the matrices dx,dy,dz,dr to store_dx, store_dy. etc
+
+   - New single row vector called dx,dy,dz,dr, to store the displacement
+     for a single "ensemble". These are then stored in store_dx, store_dy,
+     etc.
+
+   - Made a template of the getNonCommentInput function, and removed the
+     two functions specific for int/double return value. (in auxiliary.cpp)
+
+   - Created the computeWaitingTime()-method, and encapsulated the move()
+     function in a while(time is still running) condition.
+
+   - Changed the logarithmic spacing between the data points, to be more
+     like the algorithm in the Gillespie-source code.
+
+   - Calculate the pearsonCoefficient, and print it to the output as a
+     fourth column. This is work in progress. Not complete. This also
+     depends on a LU-decomposition and adds the dependency to ludcmp.h
+
+** version 5:
+   Note: this is the last version that gives output-files that are
+   comparable with all previous simulations used in my master thesis, and
+   elsewhere.
+
+   - Removed the six jump-rate vectors, and the three overloaded
+     setJumpRate-functions. Implemented a new Jump class, with members
+     .x.r, .x.l, .y.r, etc.
+
+   - I do have an auxiliary.h file
+
+** version 4:
+   ????
+
+   - removed the Xpos, Ypos, Zpos vectors and made the class Particle, to
+     store the position of the particles: (Particle pos[i].x pos[i].y was
+     Xpos[i], Ypos[i] etc.)
+
+** version 3
+   Just stating what it looks like:
+
+   - all vectors normal int/double, ie. 3 for pos. + 6 for jumprate
+
+   - Uses auxiliary.cpp (no h-file)
+
+   - has quiet-flag
+
+   - has LowMem
+
+   - interaction + (normal) hard-core interaction merged
+
+** version 2.5
+   - merged the two separate codes prog.cpp + progInteraction.cpp into one
+     single file. progInteraction.cpp was the one I previously used for
+     particles with an attractive potential. (see Master thesis.)
+
+   - I ran many test to see that nothing got messed up when I merged them,
+     but it was straight forward. only one if-statement, basically, to
+     check if we should use the interaction algorithm.
+
+** version 2
+   - Last version with prog.cpp and progInteraction.cpp separate.
+
+   - Fixed serious bug in original Gillespie code for finding the right
+     mu. It got stuck in an infinite loop for large simulations.
+
+   - all versions see a continuous revision of comments and naming of
+     variables, as I have been consistently inconsistent in the naming
+     convention. (See README.txt for my new rules on how to do this)

@@ -7,17 +7,19 @@
 //get the position of a Particle object as: object.x, and the jump
 //rate as object.rate.x.r etc.
 
-class Direction{
-public:
-  Direction(const double right,const double left);
-  Direction(const Direction&);            //copy constructor
-  Direction(void);                        //empty constructor
-  double r;  //right
-  double l;  //left
-};
-
 class Jump{
 public:
+  class Direction{
+  public:
+    Direction(double right, double left);
+    Direction(const Direction&);            //copy constructor
+    Direction(void);                        //empty constructor
+    double r;  //right
+    double l;  //left
+  };
+
+  // Jump(double xr, double xl, double yr, double yl, double zr, double zl) :
+  //   x(xr,xl), y(yr,yl), z(zr,zl){ }
   Direction x; //i.e. x.r and x.l
   Direction y;
   Direction z;
@@ -25,7 +27,7 @@ public:
 
 class Particle{
 public:
-  Particle(const int, const int, const int);  
+  Particle(int, int, int);
   Particle(const Particle&);              //copy constructor
   Particle(void);                         //empty constructor
   int x;                                  //position x
@@ -52,7 +54,7 @@ public:
 };
 
 
-//Class to show runtime information, such as remainging time
+//Class to show runtime information, such as remaining time
 //until completion, and number of ensembles left.
 class RemainingTime{
 private:

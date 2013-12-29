@@ -1,32 +1,31 @@
 #include <iostream>        //cout
 #include <iomanip>         //setw & setprecision
-#include <ctime>           //för time()
+#include <ctime>           //for time()
 #include <time.h>
 
 #include "classes.h"
 
 
-Direction::Direction(const double right,const double left){
+Jump::Direction::Direction(double right, double left){
     r = right;
     l = left;
 }
 
-Direction::Direction(const Direction &dir) : r(dir.r), l(dir.l) {
+Jump::Direction::Direction(const Direction &dir) : r(dir.r), l(dir.l) {
 }
 
-Direction::Direction(void) : r(0.0), l(0.0) {
+Jump::Direction::Direction(void) : r(0.0), l(0.0) {
 }
 
 
 
-Particle::Particle(const int X, const int Y,const int Z){
+Particle::Particle(int X, int Y,int Z){
   x = X;
   y = Y;
   z = Z;
-  
+
   //Rate automagically initiated to zero by the constructor of
   //Jump (which calls constructor of Direction which sets it to zero).
-
 }
 
 Particle::Particle(const Particle & p) : x(p.x), y(p.y), z(p.z), rate(p.rate) {
@@ -85,28 +84,28 @@ void RemainingTime::printProgress(unsigned int ensemble){
   float remaining = (float) elapsedTime / (ensemble + 1) *
     (totalEnsembles_ - ensemble) / 60.0;
 
-  float procentage = (float) ensemble / totalEnsembles_ * 100;
+  float percentage = (float) ensemble / totalEnsembles_ * 100;
 
   int ensemblesLeft = totalEnsembles_ - ensemble;
 
   //Delete previous line:
-  std::cout<<"\r";
+  std::cout << "\r";
 
   //Print again!
-  std::cout << "#" << std::setw(5) << procentage << " %  Remaining:"
+  std::cout << "#" << std::setw(5) << percentage << " %  Remaining:"
             << std::setw(6) << ensemblesLeft << " Time (min): " << std::fixed
             << std::setprecision(1) << remaining << std::flush;
 
   //If it's the last step, finish it off by removing the line.
   if (ensemble == totalEnsembles_ -1){
-    //move to begining of line
-    std::cout<<"\r";
+    //move to beginning of line
+    std::cout << " \r";
 
     //clean the line:
     std::cout << "                                           " << std::flush;
 
-    //move to begining of the clean line
-    std::cout<<"\r";
+    //move to beginning of the clean line
+    std::cout << "\r";
 
   }
 
@@ -117,4 +116,3 @@ the stream to make it output the line immediately. If you are writing to stderr
 inefficient)."
   */
 }
-
