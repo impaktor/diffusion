@@ -75,7 +75,7 @@ $(EXECUTABLE): $(OBJECTS_BASIC) $(OBJECTS_MAIN)
 clean:
 	touch -d20020101 Makedep.rule
 	make depend
-	\rm -v $(OBJECTS_MAIN) $(OBJECTS_BASIC) $(OBJECTS_SUPER) $(EXECUTABLE) super read_data
+	\rm -v $(OBJECTS_MAIN) $(OBJECTS_BASIC) $(OBJECTS_SUPER) $(EXECUTABLE) $(OBJECTS_EXTRA) super read_data
 
 #use gz:
 tar:
