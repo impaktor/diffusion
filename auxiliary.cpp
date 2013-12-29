@@ -1,113 +1,127 @@
 #include <iostream>        //for cout, among others
 #include <cstdlib>         //for abort()-function
-#include <cstring>         //strcpy, strchr 
-#include <vector>
+#include <cstring>         //strcpy, strchr
 #include <string>
 
 #include "auxiliary.h"
 
-using namespace std;
-
-
 //Read in specifications from command flags, return value through references.
 //See: http://www.gnu.org/software/libc/manual/html_node/Getopt.html
-//for information on the getopt()-function, which is what this entire 
+//for information on the getopt()-function, which is what this entire
 //function uses.
-void argumentFlags(int argc, char** argv, bool& logarithm, bool& low_mem,
-                   bool& interactionON, bool& quiet, int& interaction_strength, 
-                   char ReturnFileName[]){
-  
-  char* file_name = ReturnFileName;
-  char* default_file_name = file_name;
+void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
+                   bool& interactionON, bool& quiet, int& interactionStrength,
+                   std::string& returnFileName, int& noRuns, char& nMethod,
+                   bool& jackknife){
 
-  bool changed_file_name = false;
+  char* fileName = NULL;
+  bool changedFileName = false;
   bool error = false;
 
-  int c;
-  opterr=0;
+  //make sure we only set -b or -B, not both!
+  int usingMultipleOutputs = 0;
 
-  while((c = getopt(argc,argv,"lhmqw:o:i:"))!=-1)
+  int c;
+  opterr = 0;
+
+  while((c = getopt(argc,argv,"lhqmw:i:jB:b:")) != -1)
     switch (c){
     case 'l':
       logarithm = true;
       break;
     case 'm':
-      low_mem = true;
+      lowMem = true;
       break;
     case 'h':
-      printHelp(default_file_name,argv);
+      printHelp(returnFileName,argv);
       break;
     case 'q':
       quiet = true;
       break;
     case 'w':
-      file_name = optarg;
-      changed_file_name = true;
-      break;
-    case 'o':
-      file_name = optarg;
-      changed_file_name = true;
+      fileName = optarg;
+      changedFileName = true;
       break;
     case 'i':
-      interaction_strength = atoi(optarg);
+      interactionStrength = atoi(optarg);
       interactionON = true;
-      if (interaction_strength<0) error = true;
+      if (interactionStrength < 0) error = true;
+      break;
+    case 'j':
+      jackknife = true;
+      break;
+    case 'b':
+      nMethod = 'b';
+      noRuns = atoi(optarg);
+      ++usingMultipleOutputs;
+      break;
+    case 'B':
+      nMethod = 'B';
+      noRuns = atoi(optarg);
+      ++usingMultipleOutputs;
       break;
     case '?':
       error = true;
-      if (optopt =='w' || optopt =='o'|| optopt =='i')
-        fprintf(stderr, "Option -%c requires an argument. \n",optopt);
-        //cout<<"option "<<(char) optopt<<" requires an argument"<<endl;
+      if (optopt =='w' || optopt =='i' || optopt =='B' || optopt =='b')
+        //fprintf(stderr, "Option -%c requires an argument. \n",optopt);
+        std::cout << "Option -" << (char) optopt << " requires an argument"
+                  << std::endl;
       else if(isprint(optopt))
-        fprintf(stderr,"Unknown option '-%c'. \n",optopt);
-      //cout<<"unknown option: "<<(char) optopt<<endl;
+        //fprintf(stderr,"Unknown option '-%c'. \n",optopt);
+        std::cout << "unknown option: -"<< (char) optopt << std::endl;
       else
-        fprintf(stderr,"Unknown option character '\\x%x'.",optopt);
-      //cout<<"unknown option character "<<optopt<<endl;
+        //fprintf(stderr,"Unknown option character '\\x%x'.",optopt);
+        std::cout << "unknown option character " << optopt << std::endl;
       //return 1;
       break;
     default:
-      cout<<"Non-critical error in pogram (bad programming)"<<endl;
+      std::cout << "Non-critical error in pogram (bad programming)"<< std::endl;
       abort();
     }
 
+  if (usingMultipleOutputs > 1){
+    std::cout << "  Correct use is: " << argv[0] << " -[b/B] N" << std::endl
+              << "  where N = number of simulation re-runs "<< std::endl
+              << "  ie. number of output-files, and [b/B] is either:\n"
+              << "    -b   bootstrap (fast)" << std::endl
+              << "    -B   Brute force (roughly N times slower)" << std::endl;
+    error = true;
+  }
+
   //print error message if we entered case '?' above
   if(error){
-    cout << argv[0] << ": undefined entry." << endl
-        << "Try \"" << argv[0] << " -h\" for help." << endl;
+    std::cout << argv[0] << ": undefined entry." << std::endl
+         << "Try \"" << argv[0] << " -h\" for help." << std::endl;
     exit(1);
   }
 
+
+
   //if none of the above specified arguments were passed:
-  //take the first as new file_name, and print the rest as 
+  //take the first as new fileName, and print the rest as
   //errors
   int index;
-  bool more_than_one_invalid_argument = (changed_file_name) ? true : false;
+  bool more_than_one_invalid_argument = (changedFileName) ? true : false;
 
   for(index = optind; index < argc; index++){
-    //only run first iteration & if we didn't change filename (with w|f) 
+    //only run first iteration & if we didn't change filename (with w|f)
     if(!more_than_one_invalid_argument){
-      file_name = argv[index];
-      changed_file_name = true;
+      fileName = argv[index];
+      changedFileName = true;
     }
 
     //run for all invalid arguments except the first one
     if(more_than_one_invalid_argument)
-      printf("Non-option argument %s\n",argv[index]);
+      std::cout << "Non-option argument " << argv[index] << std::endl;
 
     more_than_one_invalid_argument = true;
   }
 
-  if(changed_file_name)
-    cout << "### Default output file changed to: " << file_name << endl;
-  else
-    file_name = default_file_name;
-
-  //cout<<endl<<"#TEST001: filename="<<(string) file_name<<endl;
-
-  //ReturnFileName=file_name;
-
-  strcpy(ReturnFileName,file_name);
+  if(changedFileName){
+    returnFileName = fileName;   //converts c-array to std::string
+    std::cout << "# Default output file changed to: "
+              << returnFileName << std::endl;
+  }
 
 }
 
@@ -121,7 +135,7 @@ T getNonCommentInput(void){
   char invalue[999];
 
   for(bool repeat = true; repeat;){
-    cin >> invalue;
+    std::cin >> invalue;
     if(strchr(invalue,'#') == NULL)
       repeat = false;
   }
@@ -131,95 +145,104 @@ T getNonCommentInput(void){
 
 //(return simulation parameters through reference)
 void AskUserForInputParameters(int& xdim, int& ydim, int& zdim,
-                               int& particleNumber, int& ensembles, 
-                               int& number_of_values, double& stopTime){
+                               int& particleNumber, int& ensembles,
+                               int& numberOfValues, double& stopTime){
 
-  cout <<"# Specify number of lattice sites in:"<<endl;
-  cout <<"# X: ";
+  std::cout << "# Specify number of lattice sites in:" << std::endl;
+  std::cout << "# X: ";
   xdim = getNonCommentInput<int>(); //ignore lines containing '#'
-  cout<<"# Y: ";
+  std::cout << "# Y: ";
   ydim = getNonCommentInput<int>(); //ignore lines containing '#'
-  cout<<"# Z: ";
+  std::cout << "# Z: ";
   zdim = getNonCommentInput<int>(); //ignore lines containing '#'
 
-  cout <<"# Total number of particles: ";
+  std::cout << "# Total number of particles: ";
   particleNumber = getNonCommentInput<int>();
 
   float info = 1.0*(xdim*ydim*zdim)/particleNumber;
- 
-  cout <<"# Number of vacant sites/particle: "<<info<<endl;
-  cout <<"# Number of ensembles: ";
+
+  std::cout << "# Number of vacant sites/particle: " << info << std::endl;
+  std::cout << "# Number of ensembles: ";
   ensembles = getNonCommentInput<int>();
-  cout <<"# Number of data-values to save: ";
-  number_of_values = getNonCommentInput<int>();
-  cout <<"# Stop-time: ";
+  std::cout << "# Number of data-values to save: ";
+  numberOfValues = getNonCommentInput<int>();
+  std::cout << "# Stop-time: ";
   stopTime = getNonCommentInput<double>();
-  cout << endl<<endl;
+  std::cout << std::endl << std::endl;
 }
 
 
-void printHelp(char* File, char** argv){
-  char* default_file_name=File;
-    cout<<"USAGE"<<endl<< "-----"<<endl;
-    cout<<"\t"<<argv[0]<<" [OPTIONS]"<<endl<<endl;
-    
-    cout<<"OPTIONS"<<endl<<"-------"<<endl;
-    cout<<"-i n\t Set interactions to ON with interaction strength \"n\".\n\t Note: n>=0, since it will be used in the Boltzmann step as \"exp(-n)\"."<<endl;
-    cout<<"-l \t Set log-spacing between data values to be written to\n\t output-file to ON."<<endl;
-    cout<<"-w NAME\t Set output-file to 'NAME'."<<endl;
-    cout<<"NAME\t Set first non-valid options-flag as name of output-file.\n (shorter/faster version than using the '-w' option)"<<endl;
-    cout<<"-q\t Set \"quiet mode\"=true. I.e print less information to the screen."<<endl;
+void printHelp(std::string File, char** argv){
+  std::string defaultFileName = File;
+  std::cout << "USAGE" << std::endl << "-----" << std::endl;
+  std::cout << "\t" << argv[0] <<" [OPTIONS]" << std::endl << std::endl;
 
-    cout<<endl<<"Arguments can be given in any order. If no flags are set the first argument following \""<<argv[0]<<"\" will be taken as the output-file name. With no arguments given the default is log-spacing of values to output-file \""<<default_file_name<<"\" without any interactions at all. Note, with '-i 0' the interaction strength will be 0, but the interaction code will be turned ON, resulting in a slower simulation run, therefore the default circumvents the interaction calculations entirely."<<endl<<endl;
+  std::cout << "OPTIONS" << std::endl <<"-------" << std::endl;
+  std::cout << "-i M\t Set interactions to ON with interaction strength \"M\".\n\t Note: M >= 0, since it will be used in the Boltzmann step as \"exp(-M)\"."<<std::endl;
+  std::cout << "-l \t Set log-spacing between data values to be written to\n\t output-file to ON." << std::endl;
+  std::cout << "-m\t Use the low memory consuming algorithm for computing std err." << std::endl;
+  std::cout << "-w NAME\t Set output-file to 'NAME'." << std::endl;
+  std::cout << "NAME\t Set first non-valid options-flag as name of output-file.\n \t(shorter/faster version than using the '-w' option)"<<std::endl;
+  std::cout << "-q\t Set \"quiet mode\"=true. I.e print less information to the screen." << std::endl;
+  std::cout << "-j\t Turn on the jackknife algorithm. The -m flag can not be used in this mode." << std::endl;
+  std::cout << "-b\t Generate the N number of outfiles (NAME0, NAME1,...) using bootstrap." << std::endl;
+  std::cout << "-B\t Generate the N number of outfiles (NAME0, NAME1,...) using Bruteforce." << std::endl;
 
-    cout<<"EXAMPLES"<<endl<<"--------"<<endl;
-    
-    cout<<"\t"<<argv[0]<<" 5.5/uniform04.dat"<<endl
-        <<"\t"<<argv[0]<<" -w 5.5/uniform04.dat"<<endl
-        <<"Puts the output in the folder \"5,5\" with the name \"uniform04.dat\"."
-        <<endl;
-    
-    cout<<"\t"<<argv[0]<<" -li 4"<<endl
-        <<"Use log-spacing, and interaction strength DeltaPhi/(K_b*T)=4."
-        <<endl;
+  std::cout << std::endl << "Arguments can be given in any order. If no flags are set the first argument following \""<<argv[0]<<"\" will be taken as the output-file name. With no arguments given the default is log-spacing of values to output-file \"" << defaultFileName <<"\" without any interactions at all. Note, with '-i 0' the interaction strength will be 0, but the interaction code will be turned ON, resulting in a slower simulation run, therefore the default circumvents the interaction calculations entirely."<<std::endl<<std::endl;
 
-    cout<<"\t"<<argv[0]<<" -li 4 powerlaw.dat"<<endl
-        <<"Since the first argument without flag will be interpreted as \"-w arg.\" this is the same as the previous example, with the additional \"-w powerlaw.dat\" argunment. Note: Be careful when using this, to make sure you are not giving the name as argument to the \"-i\" flag (like \"-i name.out\" would not give an error)."<<endl;
+  std::cout << "EXAMPLES" << std::endl << "--------" << std::endl;
 
-    cout<<"\t"<<argv[0]<<" -li 4 powerlaw01.dat <<input01.dat"<<endl
-        <<"Same as previous example but read from the input01.dat-file instead of from the keyboard. The file input01.dat has the same form as what you would type at the keyboard after execution begins." <<endl;
-    cout<<endl;
-    exit(0);
+  std::cout << "\t" << argv[0] << " 5.5/uniform04.dat" << std::endl
+       << "\t" << argv[0] <<" -w 5.5/uniform04.dat" << std::endl
+       << "Puts the output in the folder \"5.5\" with the name \"uniform04.dat\"."
+       << std::endl;
+
+  std::cout <<"\t"<< argv[0] <<" -li 4" << std::endl
+      <<"Use log-spacing, and interaction strength DeltaPhi/(K_b*T)=4."
+      <<std::endl;
+
+    std::cout << "\t" << argv[0] <<" -B 1000 -w brute.dat" << std::endl
+       << "Generate 1000 output-files: brute.dat0, brute.dat1, etc, using brute force method"
+       << std::endl;
+
+  std::cout <<"\t" << argv[0] <<" -li 4 powerlaw.dat" << std::endl
+      <<"Since the first argument without flag will be interpreted as \"-w arg.\" this is the same as the previous example, with the additional \"-w powerlaw.dat\" argunment. Note: Be careful when using this, to make sure you are not giving the name as argument to the \"-i\" flag (like \"-i name.out\" would not give an error)."<<std::endl;
+
+  std::cout <<"\t" << argv[0] <<" -li 4 powerlaw01.dat < input01.dat" << std::endl
+      <<"Same as previous example but read from the input01.dat-file instead of from the keyboard. The file input01.dat has the same form as what you would type at the keyboard after execution begins." <<std::endl;
+  std::cout << std::endl;
+
+  exit(0);
 
 }
 
 //====================================================================
 /*#include <fstream>
-#include <iostream>
+  #include <iostream>
 
-using namespace std;
+  using namespace std;
 
-int main ( int argc, char *argv[] )
-{
+  int main ( int argc, char *argv[] )
+  {
   if ( argc != 2 ) // argc should be 2 for correct execution
-    // We print argv[0] assuming it is the program name
-    cout<<"usage: "<< argv[0] <<" <filename>\n";
+  // We print argv[0] assuming it is the program name
+  std::cout<<"usage: "<< argv[0] <<" <filename>\n";
   else {
-    // We assume argv[1] is a filename to open
-    ifstream the_file ( argv[1] );
-    // Always check to see if file opening succeeded
-    if ( !the_file.is_open() )
-      cout<<"Could not open file\n";
-    else {
-      char x;
-      // the_file.get ( x ) returns false if the end of the file
-      //  is reached or an error occurs
-      while ( the_file.get ( x ) )
-        cout<< x;
-    }
-    // the_file is closed implicitly here
+  // We assume argv[1] is a filename to open
+  ifstream the_file ( argv[1] );
+  // Always check to see if file opening succeeded
+  if ( !the_file.is_open() )
+  std::cout<<"Could not open file\n";
+  else {
+  char x;
+  // the_file.get ( x ) returns false if the end of the file
+  //  is reached or an error occurs
+  while ( the_file.get ( x ) )
+  std::cout<< x;
   }
-}
+  // the_file is closed implicitly here
+  }
+  }
 
 
 */
@@ -238,34 +261,34 @@ int main ( int argc, char *argv[] )
   plot.open(name);
   //Lite information:
   plot <<"# E = "<<ensemble<<"\t N = "<<N<<"\t X-Y-Z: "
-  <<latticeX_<<"x"<<latticeY_<<"x"<<latticeZ_<<"\t concentration="<<density<<endl;
+  <<latticeX_<<"x"<<latticeY_<<"x"<<latticeZ_<<"\t concentration="<<density<<std::endl;
   //TODO: skriv ut vilken fördelning det är på jumprates...
 
   if (writeToFile){
   //set size 0.8, 0.8
-  plot<<"set term post color linewidth 1.5"<<endl;
-  plot<<"set out \""<<name<<".ps\"  "<<endl;
+  plot<<"set term post color linewidth 1.5"<<std::endl;
+  plot<<"set out \""<<name<<".ps\"  "<<std::endl;
   }
-  if(logscale) plot<<"set logscale"<<endl;
+  if(logscale) plot<<"set logscale"<<std::endl;
 
-  plot <<"set ylabel \"<r^2>\""<<endl;
-  plot <<"set xlabel \"t\""<<endl;
-  plot <<"set legend bottom"<<endl;
+  plot <<"set ylabel \"<r^2>\""<<std::endl;
+  plot <<"set xlabel \"t\""<<std::endl;
+  plot <<"set legend bottom"<<std::endl;
 
 
-  //TODO, manick som skriver vad det är för fördelning. 
+  //TODO, manick som skriver vad det är för fördelning.
   if (distribution==)
 
-  if (dim==1) plot <<"f(x)=((1-"<<density<<")/"<<density<<")*sqrt(4*"<<D_eff<<"*x/pi)"<<endl;
-  
-  plot <<"e(x)="<<ergo<<endl;
+  if (dim==1) plot <<"f(x)=((1-"<<density<<")/"<<density<<")*sqrt(4*"<<D_eff<<"*x/pi)"<<std::endl;
 
-  plot <<"n(x)= "<<D_naka<<"*x"<<endl;
+  plot <<"e(x)="<<ergo<<std::endl;
+
+  plot <<"n(x)= "<<D_naka<<"*x"<<std::endl;
 
 
 
   //om vi bill ha kvar plotten på skärmen, vill vi inte stänga filen!
-  if (ToGnuPlot!=2) plot<<"quit"<<endl;
+  if (ToGnuPlot!=2) plot<<"quit"<<std::endl;
   plot.close();
   if (ToGnuPlot!=0) system("gnuplot plot.gp");
 
@@ -297,21 +320,21 @@ int main ( int argc, char *argv[] )
 
 
 
-void printError(string message){
-  cout <<"\n Error: " << message << endl;
+void printError(std::string message){
+  std::cout <<"\n Error: " << message << std::endl;
   abort();
 }
 
 //use __FILE__ and __LINE__ macro to get line and filename;
-void printError(string message, int line){
-  cout <<"\n Error occured at line: " << line
-       << endl << message << endl;
+void printError(std::string message, int line){
+  std::cout <<"\n Error occured at line: " << line
+       << std::endl << message << std::endl;
   abort();
 }
 
-void printError(string message, string file, int line){
-  cout <<"\n Error occured in file " << file << " at line: " << line
-       << endl << message << endl;
+void printError(std::string message, std::string file, int line){
+  std::cout <<"\n Error occured in file " << file << " at line: " << line
+       << std::endl << message << std::endl;
   abort();
 }
 
