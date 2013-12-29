@@ -15,50 +15,53 @@
 #include "nr/incgammabeta.h" //needed by fitab.h
 #include "nr/fitab.h"        //needed by computeSlope()
 
+#include "classes.h"         //to print bootstrap progress to screen
 #include "auxiliary.h"       //for the printError()-function
 #include "save.h"
 
 //#include "nr/gaussj.h"      //needed by fitmrq.h
 //#include "nr/fitmrq.h"      //not yet in use...
 
-const bool SEED_BOOTSTRAP = 6854;    //default seed: 6854
+const bool USE_NR_FITTING = false;    //if true: y=a+b*x, if false: y=b*x
+const float SEED_BOOTSTRAP = 6854;    //default seed: 6854
 
 //If true, we print each bootstrapped trajectory to separate file:
 //out.dat0, out.dat1, etc, (if -w out.dat). Else (if "false") we compute
-//the H-matrix directley,
-//Note: if "false" the computet H will be printed to out.dat_matrix, i.e.
-//same name as the first "lomholt" procedure so if this is "false" and we
-//use  COMPUTE_CORRELATION = true, and USE_PEARSON_INSTEAD_OF_H_MATRIX = false
-//we will get two "out.dat_matrix"-files, one replacing the other.
+//the H-matrix directly, and output to out.dat_matrix (if -w out.dat)
 const bool BOOTSTRAP_CONSERVE_MEMORY = false;
 
 //If true, also use the hybrid "bootknife" method to compute
-//slope, and error, and write to separate file "*_hybrid"
-const bool BOOTSTRAP_HYBRID = true;
+//slope, and error, and write to separate file "out.dat_bootknife"
+const bool BOOTSTRAP_BOOTKNIFE = true;
 
-//Prints either Pearson coefficient in 4th column, or
-//the entire H-matrix in a separate file:
+//Whether to compute correlation or not, and print to 4th column of out-file:
 const bool COMPUTE_CORRELATION = false;
-const bool USE_PEARSON_INSTEAD_OF_H_MATRIX = false;
-//NOTE TODO: if we use this to get Hmatrix and then start bootstrapping,
-//and compute a H-matrix from bootstrap they will collide, and I think
-//the bootstrapped will replace the first file (out.dat_matrix)
 
-//Bin the data, and generate a histogram in a separate
-//file, to get a histogram:
+//If COMPUTE_CORRELATION == true, set 4th column as Pearson coeficient
+//if this is ture, else, save 'z' in the H-matrix as 4th column. (zH = t).
+//Save::computeCorrelation() also has a function to print entire H-matrix
+const bool COMPUTE_CORRELATION_PEARSON = false;
+
+//Bin the data, and generate a histogram in a separate file,
+//(used to check distribution of MSD.)
 const bool PRINT_DISTRIBUTION  = false;
 
-const bool PRINT_SECOND_FILE   = false;   //print <x,y,z> (un-sqrd)
+//Print <x>,<y>,<z> (un-sqrd) to out.dat_txyz (used for testing.)
+const bool PRINT_SECOND_FILE   = true;
+
 
 Save::Save(std::vector<double> samplingTime,
            int ensembles, bool lowMem = false){
 
   samplingTime_ = samplingTime;
 
-  ensembles_ = ensembles;
+  //when using computeSlope, discard any sampling points lower than this.
+  minTime_ = 0;
+
+  noEnsembles_ = ensembles;
 
   //number of elements
-  maxElement_ = samplingTime_.size();
+  noSamplingTimes_ = samplingTime_.size();
 
   //use the memory conserving function
   lowMem_ = lowMem;
@@ -66,15 +69,15 @@ Save::Save(std::vector<double> samplingTime,
   //initiate the vectors for the summation in store()
   //only needed if we use the memory-conserving algorithm
   if(lowMem_){
-    dr4_err_.assign(maxElement_,0);
-    dx4_err_.assign(maxElement_,0);
-    dy4_err_.assign(maxElement_,0);
-    dz4_err_.assign(maxElement_,0);
+    dr4_err_.assign(noSamplingTimes_,0);
+    dx4_err_.assign(noSamplingTimes_,0);
+    dy4_err_.assign(noSamplingTimes_,0);
+    dz4_err_.assign(noSamplingTimes_,0);
 
-    r2_mu_.assign(maxElement_,0);
-    x2_mu_.assign(maxElement_,0);
-    y2_mu_.assign(maxElement_,0);
-    z2_mu_.assign(maxElement_,0);
+    r2_mu_.assign(noSamplingTimes_,0);
+    x2_mu_.assign(noSamplingTimes_,0);
+    y2_mu_.assign(noSamplingTimes_,0);
+    z2_mu_.assign(noSamplingTimes_,0);
   }
   else{
     //Allocate size for the matrix to store our trajectories
@@ -98,6 +101,11 @@ Save::Save(std::vector<double> samplingTime,
 
 }
 
+//this is needed in the bootknif when we try fitting to many different
+//starting times. (since we want t*k_t to be a constant, we need to know k_t)
+void Save::setJumprate(double k_t){
+  k_t_ = k_t;
+}
 
 void Save::computeCorrelation(std::string inputName){
   //This function calculates the Pearson coefficients (see Numerical
@@ -117,18 +125,18 @@ void Save::computeCorrelation(std::string inputName){
 
   //Either compute the Pearson correlation coefficient,
   //or use the full matrix
-  if(USE_PEARSON_INSTEAD_OF_H_MATRIX){
+  if(COMPUTE_CORRELATION_PEARSON){
 
     std::vector<double> pearsonCorrelation;
-    pearsonCorrelation.assign(maxElement_,0);
+    pearsonCorrelation.assign(noSamplingTimes_,0);
 
     //compute the correlation between two points, i, j, for i = j+1
     std::vector<double> h;
-    h.assign(maxElement_,0);
+    h.assign(noSamplingTimes_,0);
 
-    for(int i = 1; i < maxElement_; i++){
-      for(int j = 0; j < ensembles_; j++){
-        h[i] += 1.0 / (ensembles_ - 1) *
+    for(int i = 1; i < noSamplingTimes_; i++){
+      for(int j = 0; j < noEnsembles_; j++){
+        h[i] += 1.0 / (noEnsembles_ - 1) *
           (pow(store_dr_[j][i],2) - r2_mu_[i])*
           (pow(store_dr_[j][i-1],2) - r2_mu_[i-1]);
       }
@@ -136,10 +144,10 @@ void Save::computeCorrelation(std::string inputName){
 
     // pearsonCorrelation[i] = h_ij / (sigma_i*sigma_j)
     // sigma_r = r2_err_ * sqrt(ensembles);
-    for(int i = 1; i < maxElement_; i++){
+    for(int i = 1; i < noSamplingTimes_; i++){
       if(r2_err_[i-1] != 0)
         pearsonCorrelation[i] = (double) h[i] /
-          (r2_err_[i] * r2_err_[i-1] * ensembles_);
+          (r2_err_[i] * r2_err_[i-1] * noEnsembles_);
 
       //NOTE: error in first value is 0, so the correlation between value 0 & 1
       //will be inf (nan)! thus the if-statement
@@ -157,23 +165,29 @@ void Save::computeCorrelation(std::string inputName){
 
     //In order to use NR implementations to test the matrix, and perform
     //LU-decomposition, we transform STL-matrix 'H' to NR-matrix
-    NRmatrix<double> h(maxElement_, maxElement_, 0.0);
+    NRmatrix<double> h(noSamplingTimes_, noSamplingTimes_, 0.0);
 
-    for(int i = 0; i < maxElement_; i++){
-      for(int j = 0; j < maxElement_; j++){
+    for(int i = 0; i < noSamplingTimes_; i++){
+      for(int j = 0; j < noSamplingTimes_; j++){
 
         //computeHmatrix only devides with (ensembles-1):
-        H[i][j] = H[i][j] / (double) ensembles_;
+        H[i][j] = H[i][j] / (double) noEnsembles_;
 
         //now copy to NR matrix.
         h[i][j] = H[i][j];
       }
     }
 
+
     //Print H-matrix to file (now that we devided it with M(M-1), which is
     //done in the for-loop above (M), and in the function "computeHmatrix()"
-    //where we devide it with (M-1), where M = ensembles_
-    printHmatrix(H,inputName);
+    //where we devide it with (M-1), where M = noEnsembles_
+    if(false){
+      //This will collide with H-matrix computed by computeBootstrap,
+      //which will also print a out.dat_matrix file, which will overwrite
+      //this one, unless the "inputName" is changed.
+      printHmatrix(H,inputName);
+    }
 
     if(false){
       //Now test the integrity of the matrix:
@@ -186,9 +200,10 @@ void Save::computeCorrelation(std::string inputName){
       //conditional number! i.e gives 0.0, instead of 3.5E-5 etc.
       //therefore, must use: << scientific <<
     }
-    if(false){//TEST:  //just a small test of NR conditional number.
+    if(false){
+      //just a small test of NR conditional number.
       NRmatrix<double> hm(2,2,0.0);
-      hm[0][0] = 1.0e-16;    //epsilon
+      hm[0][0] = 1.0e-16;   //epsilon
       hm[0][1] = 1.0;
       hm[1][0] = 1.0;
       hm[1][1] = 1.0;
@@ -200,9 +215,9 @@ void Save::computeCorrelation(std::string inputName){
 
     //Solve Equation, with LU-Decomposition
     //-------------------------------------
-    NRvector<double> b(maxElement_),z(maxElement_);
+    NRvector<double> b(noSamplingTimes_),z(noSamplingTimes_);
 
-    for(unsigned int i = 0; i < maxElement_; i++)
+    for(int i = 0; i < noSamplingTimes_; i++)
       b[i] = samplingTime_[i];
 
     LUdcmp LUdecomposition(h);
@@ -210,8 +225,8 @@ void Save::computeCorrelation(std::string inputName){
 
     //copy z to the class-private vector, that we will print as the
     //fourth column in the output-file. Transfer a NR vector to std::
-    fourthColumn_.assign(maxElement_,0);
-    for (int i = 0; i < maxElement_; i++)
+    fourthColumn_.assign(noSamplingTimes_,0);
+    for (int i = 0; i < noSamplingTimes_; i++)
       fourthColumn_[i] = z[i];
     std::cout << "fourth column in " << inputName << " is z" << std::endl;
 
@@ -239,10 +254,9 @@ void Save::store(const std::vector<int>& dx, const std::vector<int>& dy,
     but just two vectors, for each dimension.
   */
 
-  //Check that we assigned the vectors =0 if we uses the lowMem-option.
+  //Check that we assigned the vectors =0 if we use the lowMem-option.
   //For lowMem=false, we do this in the Save & computeStdErr()-functions
   //since we use push_back() instead.
-
   if(lowMem_){
     bool error = false;
     if (dr4_err_.size() == 0) error = true;
@@ -274,7 +288,7 @@ void Save::store(const std::vector<int>& dx, const std::vector<int>& dy,
     //cause a numerical error in the end compared to doing it the
     //more rigorous way, but all tests I've made returns identical
     //output
-    for(int i = 0; i < maxElement_; i++){
+    for(int i = 0; i < noSamplingTimes_; i++){
       dr4_err_[i] = dr4_err_[i] + pow( dr[i] ,4);
       dx4_err_[i] = dx4_err_[i] + pow( dx[i] ,4);
       dy4_err_[i] = dy4_err_[i] + pow( dy[i] ,4);
@@ -307,39 +321,28 @@ void Save::save(std::string name, std::string head){
     //specifically. Not needed now, since system is isotropic,
 
     if(printSecondFile){
-      //Check that <x,y,z>=0, just for testing purpose.
-      //Compute <R>:
+      //Check that <x,y,z>=0, just for fun/testing purpose.
 
       std::string secondFileName = name + "_txyz";
       secondary.open(secondFileName.c_str());
 
-      x_mu.assign(maxElement_,0);
-      y_mu.assign(maxElement_,0);
-      z_mu.assign(maxElement_,0);
-      r_mu.assign(maxElement_,0);
+      //return mean, (unsqared), as reference in x_mu,..,z_mu
+      computeMean(store_dx_,store_dy_,store_dz_, x_mu, y_mu, z_mu);
 
-      for (int j = 0; j < maxElement_; j++){
-        for (int i = 0; i < ensembles_ ; i++){
-          x_mu[j] = x_mu[j] + 1.0 * store_dx_[i][j] / ensembles_;
-          y_mu[j] = y_mu[j] + 1.0 * store_dy_[i][j] / ensembles_;
-          z_mu[j] = z_mu[j] + 1.0 * store_dz_[i][j] / ensembles_;
-          //r_mu_[j] = r_mu_[j] + 1.0*store_dr_[i][j] / ensembles_; //not using this
-        }
-      }
     }//end of printSecondFile if statement
 
     //Compute <R^2>:
-    x2_mu_.assign(maxElement_,0);
-    y2_mu_.assign(maxElement_,0);
-    z2_mu_.assign(maxElement_,0);
-    r2_mu_.assign(maxElement_,0);
+    x2_mu_.assign(noSamplingTimes_,0);
+    y2_mu_.assign(noSamplingTimes_,0);
+    z2_mu_.assign(noSamplingTimes_,0);
+    r2_mu_.assign(noSamplingTimes_,0);
 
-    for (int j = 0; j < maxElement_; j++){
-      for (int i = 0; i < ensembles_;i++){
-        x2_mu_[j] = x2_mu_[j] + 1.0 * pow(store_dx_[i][j],2) / ensembles_;
-        y2_mu_[j] = y2_mu_[j] + 1.0 * pow(store_dy_[i][j],2) / ensembles_;
-        z2_mu_[j] = z2_mu_[j] + 1.0 * pow(store_dz_[i][j],2) / ensembles_;
-        r2_mu_[j] = r2_mu_[j] + 1.0 * pow(store_dr_[i][j],2) / ensembles_;
+    for (int j = 0; j < noSamplingTimes_; j++){
+      for (int i = 0; i < noEnsembles_;i++){
+        x2_mu_[j] = x2_mu_[j] + 1.0 * pow(store_dx_[i][j],2) / noEnsembles_;
+        y2_mu_[j] = y2_mu_[j] + 1.0 * pow(store_dy_[i][j],2) / noEnsembles_;
+        z2_mu_[j] = z2_mu_[j] + 1.0 * pow(store_dz_[i][j],2) / noEnsembles_;
+        r2_mu_[j] = r2_mu_[j] + 1.0 * pow(store_dr_[i][j],2) / noEnsembles_;
       }
     }
 
@@ -353,7 +356,7 @@ void Save::save(std::string name, std::string head){
       //(many ensembles and sampling points)
       computeCorrelation(name);
     else
-      fourthColumn_.assign(maxElement_,0);
+      fourthColumn_.assign(noSamplingTimes_,0);
 
   }
   else{
@@ -366,15 +369,22 @@ void Save::save(std::string name, std::string head){
   if(lowMem_)  //NOTE: temporary, if lowMem is on!
     //TODO: calculate this even if lowMem_ = true!
     //does not serve any purpose at this point.
-    fourthColumn_.assign(maxElement_,0);
+    fourthColumn_.assign(noSamplingTimes_,0);
 
   //print data to file:
   ofstream primary;
   primary.open(name.c_str());
   primary << head;
-  std::cout << std::endl << head;
+  std::cout << head;
 
-  for (int i = 0; i < maxElement_; i++){
+  if(printSecondFile){
+    //print comment to file:
+    secondary << "# <time>  <x_mu>  <y_mu>  <z_mu>  <time>   "
+              << "<x2_mu>  <y2_mu>  <z2_mu>  "
+              << "<x2_err>  <y2_err>  <z2_err>" <<std::endl;
+  }
+
+  for (int i = 0; i < noSamplingTimes_; i++){
 
     //Print it to file:
     primary << samplingTime_[i] << "\t" << r2_mu_[i] << "\t"
@@ -402,13 +412,13 @@ void Save::computeStdErr(void){
   if(lowMem_)
     printError("LowMem switch ON, but using wrong stdErr-function!");
 
-  x2_err_.assign(maxElement_,0);
-  y2_err_.assign(maxElement_,0);
-  z2_err_.assign(maxElement_,0);
-  r2_err_.assign(maxElement_,0);
+  x2_err_.assign(noSamplingTimes_,0);
+  y2_err_.assign(noSamplingTimes_,0);
+  z2_err_.assign(noSamplingTimes_,0);
+  r2_err_.assign(noSamplingTimes_,0);
 
-  for (int j = 0; j < maxElement_; j++){
-    for (int i = 0; i < ensembles_; i++){
+  for (int j = 0; j < noSamplingTimes_; j++){
+    for (int i = 0; i < noEnsembles_; i++){
       x2_err_[j] += pow (pow(store_dx_[i][j],2) - x2_mu_[j] ,2);
       y2_err_[j] += pow (pow(store_dy_[i][j],2) - y2_mu_[j] ,2);
       z2_err_[j] += pow (pow(store_dz_[i][j],2) - z2_mu_[j] ,2);
@@ -416,21 +426,21 @@ void Save::computeStdErr(void){
     }//( "a += b" is the same as "a = a + b")
   }
 
-  for (int j = 0; j < maxElement_  ; j++){
-    x2_err_[j] = sqrt( x2_err_[j] / (1.0*ensembles_*(ensembles_ - 1)) );
-    y2_err_[j] = sqrt( y2_err_[j] / (1.0*ensembles_*(ensembles_ - 1)) );
-    z2_err_[j] = sqrt( z2_err_[j] / (1.0*ensembles_*(ensembles_ - 1)) );
-    r2_err_[j] = sqrt( r2_err_[j] / (1.0*ensembles_*(ensembles_ - 1)) );
+  for (int j = 0; j < noSamplingTimes_  ; j++){
+    x2_err_[j] = sqrt( x2_err_[j] / (1.0*noEnsembles_*(noEnsembles_ - 1)) );
+    y2_err_[j] = sqrt( y2_err_[j] / (1.0*noEnsembles_*(noEnsembles_ - 1)) );
+    z2_err_[j] = sqrt( z2_err_[j] / (1.0*noEnsembles_*(noEnsembles_ - 1)) );
+    r2_err_[j] = sqrt( r2_err_[j] / (1.0*noEnsembles_*(noEnsembles_ - 1)) );
   } //for E = 1 --> inf !
 
 
   if(false){
     //Testing the Gaussian distribution of the sampling points:
     float SUM68 = 0;
-    for (int j = 0; j < maxElement_; j++){    //forgot about his:
-      double top = x2_mu_[j] +0.5*x2_err_[j] * sqrt(ensembles_-1)*2;
-      double bot = x2_mu_[j] -0.5*x2_err_[j] * sqrt(ensembles_-1)*2;
-      for (int i=0; i < ensembles_; i++){
+    for (int j = 0; j < noSamplingTimes_; j++){    //forgot about his:
+      double top = x2_mu_[j] +0.5*x2_err_[j] * sqrt(noEnsembles_-1)*2;
+      double bot = x2_mu_[j] -0.5*x2_err_[j] * sqrt(noEnsembles_-1)*2;
+      for (int i=0; i < noEnsembles_; i++){
         if (bot <= pow(store_dx_[i][j],2) &&
             top >= pow(store_dx_[i][j],2) ){
           bool test = false;
@@ -445,7 +455,7 @@ void Save::computeStdErr(void){
       }
     }
     std::cout << "68,2 % (?)="
-              << 1.0 * SUM68/(ensembles_ * maxElement_) << std::endl;
+              << 1.0 * SUM68/(noEnsembles_ * noSamplingTimes_) << std::endl;
   }
 
 }
@@ -457,32 +467,32 @@ void Save::computeStdErrLowMem(void){
     printError("lowMem = OFF, but using StdErrLowMem()-func!");
 
   //Divide the summed up displacement to get the average:
-  for (int i = 0; i< maxElement_; i++){
-    x2_mu_[i] = x2_mu_[i] / (ensembles_ * 1.0);
-    y2_mu_[i] = y2_mu_[i] / (ensembles_ * 1.0);
-    z2_mu_[i] = z2_mu_[i] / (ensembles_ * 1.0);
-    r2_mu_[i] = r2_mu_[i] / (ensembles_ * 1.0);
+  for (int i = 0; i< noSamplingTimes_; i++){
+    x2_mu_[i] = x2_mu_[i] / (noEnsembles_ * 1.0);
+    y2_mu_[i] = y2_mu_[i] / (noEnsembles_ * 1.0);
+    z2_mu_[i] = z2_mu_[i] / (noEnsembles_ * 1.0);
+    r2_mu_[i] = r2_mu_[i] / (noEnsembles_ * 1.0);
   }
 
-  x2_err_.assign(maxElement_,0);
-  y2_err_.assign(maxElement_,0);
-  z2_err_.assign(maxElement_,0);
-  r2_err_.assign(maxElement_,0);
+  x2_err_.assign(noSamplingTimes_,0);
+  y2_err_.assign(noSamplingTimes_,0);
+  z2_err_.assign(noSamplingTimes_,0);
+  r2_err_.assign(noSamplingTimes_,0);
 
   //Following the notation in the comments in Lattice::store():
   // [1/N sum_i^N a_i^2] - [<a>^2], (a=dr^2)
-  for(int i = 0; i < maxElement_; i++){
-    x2_err_[i] = dx4_err_[i] / (1.0 * ensembles_) - pow( x2_mu_[i] ,2);
-    y2_err_[i] = dy4_err_[i] / (1.0 * ensembles_) - pow( y2_mu_[i] ,2);
-    z2_err_[i] = dz4_err_[i] / (1.0 * ensembles_) - pow( z2_mu_[i] ,2);
-    r2_err_[i] = dr4_err_[i] / (1.0 * ensembles_) - pow( r2_mu_[i] ,2);
+  for(int i = 0; i < noSamplingTimes_; i++){
+    x2_err_[i] = dx4_err_[i] / (1.0 * noEnsembles_) - pow( x2_mu_[i] ,2);
+    y2_err_[i] = dy4_err_[i] / (1.0 * noEnsembles_) - pow( y2_mu_[i] ,2);
+    z2_err_[i] = dz4_err_[i] / (1.0 * noEnsembles_) - pow( z2_mu_[i] ,2);
+    r2_err_[i] = dr4_err_[i] / (1.0 * noEnsembles_) - pow( r2_mu_[i] ,2);
   }
 
-  for(int i =0; i < maxElement_; i++){
-    x2_err_[i] = sqrt(x2_err_[i] / (1.0 * (ensembles_ - 1) ));
-    y2_err_[i] = sqrt(y2_err_[i] / (1.0 * (ensembles_ - 1) ));
-    z2_err_[i] = sqrt(z2_err_[i] / (1.0 * (ensembles_ - 1) ));
-    r2_err_[i] = sqrt(r2_err_[i] / (1.0 * (ensembles_ - 1) ));
+  for(int i =0; i < noSamplingTimes_; i++){
+    x2_err_[i] = sqrt(x2_err_[i] / (1.0 * (noEnsembles_ - 1) ));
+    y2_err_[i] = sqrt(y2_err_[i] / (1.0 * (noEnsembles_ - 1) ));
+    z2_err_[i] = sqrt(z2_err_[i] / (1.0 * (noEnsembles_ - 1) ));
+    r2_err_[i] = sqrt(r2_err_[i] / (1.0 * (noEnsembles_ - 1) ));
   }
 }
 
@@ -499,17 +509,17 @@ void Save::saveBinning(std::string fileName){
 
     //find the smallest/biggest value in store_dr_[*][t]
     //-----------------------------------------------
-    int samplingTime = maxElement_ -1; //pick sampling time
+    int samplingTime = noSamplingTimes_ -1; //pick sampling time
 
     std::vector<double> tempVectorR2;
     std::vector<double> tempVectorX2;
     std::vector<double> tempVectorY2;
 
-    tempVectorR2.assign(ensembles_,0);
-    tempVectorX2.assign(ensembles_,0);
-    tempVectorY2.assign(ensembles_,0);
+    tempVectorR2.assign(noEnsembles_,0);
+    tempVectorX2.assign(noEnsembles_,0);
+    tempVectorY2.assign(noEnsembles_,0);
 
-    for (int i = 0; i < ensembles_; i++){
+    for (int i = 0; i < noEnsembles_; i++){
       //(I don't know of a better way to do this)
       tempVectorR2[i] = pow(store_dr_[i][samplingTime],2);
       tempVectorX2[i] = pow(store_dx_[i][samplingTime],2);
@@ -568,7 +578,7 @@ void Save::saveBinning(std::string fileName){
       std::cout << "binAxisR2["<<i<<"] = " << binAxisR2[i] << std::endl;
     }
 
-    const double PI = 3.14159265;
+    //const double PI = 3.14159265;
     double r2;                      //displacement
     double x2;                      //displacement
     double y2;                      //displacement
@@ -577,27 +587,27 @@ void Save::saveBinning(std::string fileName){
 
     //Analyze all sampling-times, or just one? (start with one)
     const int startTimeElement = samplingTime; // 0;
-    const int endTime = startTimeElement + 1;  // maxElement_;
+    const int endTime = startTimeElement + 1;  // noSamplingTimes_;
 
     for(int t = startTimeElement; t < endTime ; t++){ //loop over time
       for (int j = 0; j < noBins; j++){               //loop over bin-cells
-        for(int e = 0; e < ensembles_; e++){          //loop over "ensembles"
+        for(int e = 0; e < noEnsembles_; e++){          //loop over "ensembles"
           r2 = pow(store_dr_[e][t],2);
           x2 = pow(store_dx_[e][t],2);
           y2 = pow(store_dy_[e][t],2);
 
           //why 2*PI ? r? (November 2010)
           //if(binAxis[j+1] > r2 && r2 >= binAxis[j])
-          //probAxis[j] = probAxis[j] + 1.0/(ensembles_ * 2 * PI * ((r2 + binStep)/2));
+          //probAxis[j] = probAxis[j] + 1.0/(noEnsembles_ * 2 * PI * ((r2 + binStep)/2));
 
           if(binAxisR2[j+1] > r2 && r2 >= binAxisR2[j])
-            probAxisR2[j] = probAxisR2[j] + 1.0 / ensembles_;
+            probAxisR2[j] = probAxisR2[j] + 1.0 / noEnsembles_;
 
           if(binAxisX2[j+1] > x2 && x2 >= binAxisX2[j])
-            probAxisX2[j] = probAxisX2[j] + 1.0 / ensembles_;
+            probAxisX2[j] = probAxisX2[j] + 1.0 / noEnsembles_;
 
           if(binAxisY2[j+1] > y2 && y2 >= binAxisY2[j])
-            probAxisY2[j] = probAxisY2[j] + 1.0 / ensembles_;
+            probAxisY2[j] = probAxisY2[j] + 1.0 / noEnsembles_;
 
         }
       }
@@ -630,8 +640,8 @@ void Save::saveBinning(std::string fileName){
     histY2.open(histogramNameY2.c_str());
 
     std::cout << " ...Printing histogram... " << std::endl;
-    int maxElement = printToFileR2.size();   //or maxElement_
-    for(int i = 0; i < maxElement; i++){   //loop over time
+    int noSamplingTimes = printToFileR2.size();   //or noSamplingTimes_
+    for(int i = 0; i < noSamplingTimes; i++){   //loop over time
       for(int j = 0; j < noBins; j++){     //loop over bins
         if (printToFileR2[i][j] != 0){
           histR2 << binAxisR2[j] + binStepR2/2 //<< "\t" << samplingTime_[i]
@@ -695,12 +705,20 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
 
     std::cout << "bootstrapping!" << std::endl;
 
-    std::vector<double> r2_mu, temp;
+    std::vector<double> r2_mu, tempDouble;
+    std::vector<int> tempInt;
     std::vector<std::vector<double> > store_dr;
 
+    //March 2011: to check that MSD := [x - <x>]^2
+    std::vector<std::vector<int> > store_dx, store_dy, store_dz;
+
     //Assign store_dr (local variable) with zeros
-    temp.assign(maxElement_,0);
-    store_dr.assign(ensembles_,temp);
+    tempDouble.assign(noSamplingTimes_,0);
+    tempInt.assign(noSamplingTimes_,0);
+    store_dr.assign(noEnsembles_,tempDouble);
+    // store_dx.assign(noEnsembles_,tempInt);
+    // store_dy.assign(noEnsembles_,tempInt);
+    // store_dz.assign(noEnsembles_,tempInt);
 
     Ran randomNumber(SEED_BOOTSTRAP);
 
@@ -710,37 +728,78 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
     //but uses more memory
     bool conserveMemory = BOOTSTRAP_CONSERVE_MEMORY;
     std::vector<std::vector<double> > catanateOutputFiles;
-    if(!conserveMemory)  catanateOutputFiles.assign(numberOfRuns,temp);
+    if(!conserveMemory)  catanateOutputFiles.assign(numberOfRuns,tempDouble);
+
+    //used in bootknife-loop, this does not look good!
+    std::vector<double> dr2_err;
+    bool bootknife = BOOTSTRAP_BOOTKNIFE;
+
+    //construct a vector with a number of starting times for the fitting
+    std::vector<double> startTimeForFitting;
+
+    // k_t * t should have these values, corresponding to errors:
+    // 1.010  = 2.45
+    // 1.0050 = 7.34
+    // 1.0020 = 25.40
+    // 1.0010 = 58.34
+    // 1.0005 = 140
+    const double tempArray[] = {0, 2.45, 7.34, 10, 20, 25.40, 30, 40, 50,
+                                58.34, 70, 80, 90, 100, 110, 120, 130, 140};
+
+    size_t sizeOfTempArray = (sizeof tempArray)/(sizeof tempArray[0]);
+
+    //now transform to time values:
+    for (unsigned int i = 0; i < sizeOfTempArray; i++){
+      float timeMark = (float) tempArray[i] / k_t_;
+      startTimeForFitting.push_back(timeMark);
+    }
+
+    int noReFittings = startTimeForFitting.size();
+    std::vector<std::vector<double> > mu, sigma_mu;
+    std::vector<double> temp;
+    temp.assign(noReFittings,0);
+    mu.assign(numberOfRuns,temp);
+    sigma_mu.assign(numberOfRuns,temp);
 
 
-    //used in hybrid-loop, this does not look good!
-    std::vector<double> mu, sigma_mu, dr2_err;
-    bool hybrid = BOOTSTRAP_HYBRID;
 
-    //store all MSD-fitted slopes (and corresponding error)
-    mu.assign(numberOfRuns,0);
-    sigma_mu.assign(numberOfRuns,0);
-
+    //non-important nice-to-have simulation info.
+    //this now makes save.cpp depend on classes.[h,cpp]
+    RemainingTime progressToScreen(numberOfRuns);
 
     //Loop to generate "numberOfRuns" number of synthetic MSDs of
     //trajectories, each saved MSD corresponds to a simulation of
-    //"ensembles_" number of individual trajectories (i.e. ensembles).
+    //"noEnsembles_" number of individual trajectories (i.e. ensembles).
     for(int k = 0; k < numberOfRuns; k++){
+
+      progressToScreen.printProgress(k);
 
       //Randomly pick real trajectories into our virtual simulation
       //-----------------------------------------------------------
       int r;
-      for (int i = 0; i < ensembles_; i++){
-        r = (int) (ensembles_ * randomNumber.doub());
+      for (int i = 0; i < noEnsembles_; i++){
+        r = (int) (noEnsembles_ * randomNumber.doub());
         store_dr[i] = store_dr_[r];
+
+        //March 2011: adding these, to use MSD := [x-<x>]^2 instead.
+        //(i.e Not assuming <x>~0)
+        // store_dx[i] = store_dx_[r];
+        // store_dy[i] = store_dy_[r];
+        // store_dz[i] = store_dz_[r];
       }
 
+      //TEST: to see if using MSD = [x-<x>]^2 rather than taking <x>=0.
+      std::vector<double> dx_mu, dy_mu, dz_mu;
+      //computeMean(store_dx,store_dy,store_dz, dx_mu, dy_mu, dz_mu);
+
+
       //Compute <R^2>:
-      computeMSD(store_dr,r2_mu);
+      //computeMSD(store_dx,store_dy,store_dz,dx_mu,dy_mu,dz_mu, r2_mu);
+      computeMSD(store_dr, r2_mu);
 
 
-      if(hybrid){
-        //this is an alternative "hybrid" version of bootstrap, where we
+      if(bootknife){
+        //this is an alternative "bootknife" version of bootstrap, where we
         //refrain from using H-matrices, and just fit a line to current
         //bootstrapped "simulation" (as if uncorrelated, like in the
         //jackknife-method), and then take all my slopes and compute an
@@ -752,13 +811,13 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
         computeError(store_dr,r2_mu,dr2_err);
 
         //get mu and sigma_mu
-        computeSlope(r2_mu, dr2_err, mu[k], sigma_mu[k]);
-
-        //TEST
-        //std::cout << setprecision(5) << scientific << mu[k] << std::endl;
+        //patch to modify/test minTime for fitting:
+        for(int i = 0; i < noReFittings; i++){
+          minTime_ = startTimeForFitting[i];
+          computeSlope(r2_mu, dr2_err, mu[k][i], sigma_mu[k][i]);
+        }
 
       }
-
 
       if (conserveMemory){
 
@@ -772,7 +831,7 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
         bootOutput.open(nameOfFile.c_str());
 
         bootOutput << head;
-        for (int i = 0; i < maxElement_; i++){
+        for (int i = 0; i < noSamplingTimes_; i++){
           bootOutput  << samplingTime_[i] << "\t" << r2_mu[i] << std::endl;
         }
         bootOutput.close();
@@ -785,38 +844,47 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
     } //(end of for-loop (with k-iterator))
 
 
-    if(hybrid){
-      //continue on task done in previous if(hybrid)-statement
+    if(bootknife){
+      //continue on task done in previous if(bootknife)-statement
 
-      double mu_average = 0;
-      double sigma_mu_final = 0;
+      //only needs to be a vector if we fit for several different
+      //starting times.
+      std::vector<double> mu_average;
+      std::vector<double> sigma_mu_final;
 
-      for (int i = 0; i < numberOfRuns; i++){
-        mu_average += mu[i];
+      mu_average.assign(noReFittings,0);
+      sigma_mu_final.assign(noReFittings,0);
+
+      for (int i = 0; i < noReFittings; i++ ){
+        for (int j = 0; j < numberOfRuns; j++){
+          mu_average[i] += mu[j][i];
+        }
+        mu_average[i] = mu_average[i] /( (double) numberOfRuns);
       }
 
-      mu_average = mu_average /( (double) numberOfRuns);
-
-      for (int i = 0; i < numberOfRuns; i++){
-        sigma_mu_final += pow(mu[i] - mu_average ,2);
+      for (int i = 0; i < noReFittings; i++ ){
+        for (int j = 0; j < numberOfRuns; j++){
+          sigma_mu_final[i] += pow(mu[j][i] - mu_average[i] ,2);
+        }
+        sigma_mu_final[i] = sqrt( sigma_mu_final[i] /((double) (numberOfRuns-1) ));
       }
-
-      sigma_mu_final = sqrt( sigma_mu_final /((double) (numberOfRuns-1) ));
-
-      std::cout <<  "mu: " << mu_average << std::endl
-                <<  "sig_mu: " << sigma_mu_final << std::endl;
+      //NOTE Anvander jag inte sigma_mu? vad skall jag med den till da?
 
 
       //Print bootstrapped mean of mean to file:
       //-----------------------------------------
-      ofstream hybridOut;
-      std::string nameOfFile = name + "_hybrid";
-      hybridOut.open(nameOfFile.c_str());
+      ofstream bootknifeOut;
+      std::string nameOfFile = name + "_bootknife";
+      bootknifeOut.open(nameOfFile.c_str());
 
-      hybridOut  <<  " # mu, and sig_mu " << std::endl
-                 << mu_average << std::endl
-                 << sigma_mu_final << std::endl;
-      hybridOut.close();
+      bootknifeOut  <<  "#t_{start},  mu,  and sig_mu " << std::endl;
+
+      for (int i = 0; i < noReFittings; i++ ){
+        bootknifeOut << startTimeForFitting[i] << "\t" << mu_average[i] << "\t"
+                     << sigma_mu_final[i] << std::endl;
+      }
+
+      bootknifeOut.close();
 
     }
 
@@ -826,10 +894,10 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
       //compute the H-matrix and dump that to a single file.
 
       //Compute the mean of the Mean Sq. Disp. (don't square it!)
-      //use numberOfRuns instead of ensembles_ since might not be the same
+      //use numberOfRuns instead of noEnsembles_ since might not be the same
       std::vector<double> meanOfMsd;
-      meanOfMsd.assign(maxElement_,0);
-      for (int j = 0; j < maxElement_; j++){
+      meanOfMsd.assign(noSamplingTimes_,0);
+      for (int j = 0; j < noSamplingTimes_; j++){
         for (int i = 0; i < numberOfRuns; i++){
           meanOfMsd[j] = meanOfMsd[j] + 1.0 * catanateOutputFiles[i][j]
             / numberOfRuns;
@@ -850,7 +918,7 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
       msdBootout.open(nameOfFile.c_str());
 
       msdBootout << head;
-      for (int i = 0; i < maxElement_; i++){
+      for (int i = 0; i < noSamplingTimes_; i++){
        msdBootout  << samplingTime_[i] << "\t" << meanOfMsd[i] << std::endl;
       }
       msdBootout.close();
@@ -884,16 +952,16 @@ void Save::computeJackknife(std::string outName){
 
     //store all the jackknifed versions of the fitted parameter
     std::vector<double> slopeJ;
-    slopeJ.assign(ensembles_,0);
+    slopeJ.assign(noEnsembles_,0);
 
     //matrix of all simulation trajectories that we will "Jackknife"
     std::vector<std::vector<double> > store_dr_J;
     std::vector<double> dr2J, sigma;
-    for (int i = 0; i < ensembles_; i++){
+    for (int i = 0; i < noEnsembles_; i++){
       store_dr_J = store_dr_;
       store_dr_J.erase(store_dr_J.begin()+i);
 
-      //compute mean for each time based on the ensembles_-1
+      //compute mean for each time based on the noEnsembles_-1
       //trajectories and return the MSD as dr2J
       computeMSD(store_dr_J, dr2J);
       computeError(store_dr_J, dr2J, sigma);
@@ -906,9 +974,9 @@ void Save::computeJackknife(std::string outName){
     double sigmaJ2 = 0;
     double slopeJtotal = 0;
 
-    for (int i = 0; i < ensembles_; i++){
+    for (int i = 0; i < noEnsembles_; i++){
 
-      sigmaJ2 = sigmaJ2 + 1.0*(ensembles_ - 1)/ensembles_ *
+      sigmaJ2 = sigmaJ2 + 1.0*(noEnsembles_ - 1)/noEnsembles_ *
         pow((slopeJ[i] - slope),2);
 
       slopeJtotal = slopeJtotal + slopeJ[i];
@@ -916,8 +984,8 @@ void Save::computeJackknife(std::string outName){
     }
 
     //correction for bias:
-    slopeJtotal = 1.0 * slopeJtotal / ensembles_;
-    slope = slope - 1.0*(ensembles_ - 1) * (slopeJtotal - slope);
+    slopeJtotal = 1.0 * slopeJtotal / noEnsembles_;
+    slope = slope - 1.0*(noEnsembles_ - 1) * (slopeJtotal - slope);
 
     //Print result:
     //-------------
@@ -973,7 +1041,17 @@ void Save::computeSlopeInner(const std::vector<double>& dr,
   //or using my own implementation: y = mu * x
   //(pass by reference to increase speed)
 
-  bool useNR_fitting = false;
+
+  //patch to remove the first values when doing the fit. Note:
+  //think wether we want to use fitab or fitb when doing this.
+  int minElement = 0;
+  for (minElement = 0; minElement < noSamplingTimes_ &&
+         samplingTime_[minElement] < minTime_; minElement++){
+    //just want to iterate our "minElement" to find minimum index
+  }
+
+
+  bool useNR_fitting = USE_NR_FITTING;
 
   if (!useNR_fitting){
     //My own implementation of Ch. 15 of Numerical Recipes, where fitab.h
@@ -983,7 +1061,7 @@ void Save::computeSlopeInner(const std::vector<double>& dr,
     double Sty = 0;
     double Stt = 0;
 
-    for(int i = 0; i < maxElement_; i++){
+    for(int i = minElement; i < noSamplingTimes_; i++){
       Stt = Stt + 1.0*pow(samplingTime_[i],2) / pow(dr_err[i],2);
       Sty = Sty + 1.0*samplingTime_[i] * dr[i] / pow(dr_err[i],2);
     }
@@ -999,15 +1077,15 @@ void Save::computeSlopeInner(const std::vector<double>& dr,
     //If we want to use the NR code for fitting:
 
     //fitab wants NRvector...
-    NRvector<double> sigma(maxElement_,0.0);
-    NRvector<double> X(maxElement_,0.0);
-    NRvector<double> Y(maxElement_,0.0);
+    NRvector<double> sigma(noSamplingTimes_ - minElement,0.0);
+    NRvector<double> X(noSamplingTimes_ - minElement,0.0);
+    NRvector<double> Y(noSamplingTimes_ - minElement,0.0);
 
     //...so copy input STL-vectors to NRvector
-    for(int i = 0; i < maxElement_; i++){
-      X[i] = samplingTime_[i];
-      Y[i] = dr[i];
-      sigma[i] = dr_err[i];
+    for(int i = 0; i < noSamplingTimes_ - minElement; i++){
+      X[i] = samplingTime_[minElement + i];
+      Y[i] = dr[minElement + i];
+      sigma[i] = dr_err[minElement + i];
     }
 
     //see NR p 784, fit the function y = a + bx
@@ -1035,15 +1113,15 @@ void Save::computeSlopeInner(const std::vector<double>& dr,
 
 
 inline void Save::computeMSD(const std::vector<std::vector<double> >& store,
-                              std::vector<double>& msd){
+                             std::vector<double>& msd){
   //save and return (by reference&) the mean square displacement:
-  msd.assign(maxElement_,0);
+  msd.assign(noSamplingTimes_,0);
 
   //don't use the "ensemble_" variable as iteration limit, since we will be
   //fiddling with this in the jackknife implementation.
   const int ensembles = store.size();
 
-  for (int j = 0; j < maxElement_; j++){
+  for (int j = 0; j < noSamplingTimes_; j++){
     for (int i = 0; i < ensembles; i++){
       msd[j] = msd[j] + 1.0 * pow(store[i][j],2) / ensembles;
     }
@@ -1051,35 +1129,71 @@ inline void Save::computeMSD(const std::vector<std::vector<double> >& store,
 }
 
 
-inline void Save::computeMean(const std::vector<std::vector<double> >& store,
-                              std::vector<double>& mean){
-  //same function as computeMSD, but don't square it.
+//Overloaded function, to test: MSD(t_i) = sum_m [x_i^(m) - <x_i>]^2
+//i.e. since M != inf  --> <x> != 0.
+inline void Save::computeMSD(const std::vector<std::vector<int> >& store_dx,
+                             const std::vector<std::vector<int> >& store_dy,
+                             const std::vector<std::vector<int> >& store_dz,
+                             const std::vector<double>& dx_mu,
+                             const std::vector<double>& dy_mu,
+                             const std::vector<double>& dz_mu,
+                             std::vector<double>& msd){
 
-  //save and return (by reference&) the mean:
-  mean.assign(maxElement_,0);
+  //save and return (by reference&) the mean square displacement:
+  msd.assign(noSamplingTimes_,0);
 
   //don't use the "ensemble_" variable as iteration limit, since we will be
   //fiddling with this in the jackknife implementation.
-  const int ensembles = store.size();
+  const int ensembles = store_dx.size();
 
-  for (int j = 0; j < maxElement_; j++){
+  for (int j = 0; j < noSamplingTimes_; j++){
     for (int i = 0; i < ensembles; i++){
-      mean[j] = mean[j] + 1.0 * store[i][j] / ensembles;
+      msd[j] += 1.0/(ensembles-1.0) * (
+        pow( store_dx[i][j] - dx_mu[j],2) +
+        pow( store_dy[i][j] - dy_mu[j],2) +
+        pow( store_dz[i][j] - dz_mu[j],2));
     }
   }
 }
+
+
+
+
+inline void Save::computeMean(const std::vector<std::vector<int> >& store_dx,
+                              const std::vector<std::vector<int> >& store_dy,
+                              const std::vector<std::vector<int> >& store_dz,
+                              std::vector<double>& x_mu,
+                              std::vector<double>& y_mu,
+                              std::vector<double>& z_mu){
+
+  //save and return (by reference&) the mean:
+  x_mu.assign(noSamplingTimes_,0);
+  y_mu.assign(noSamplingTimes_,0);
+  z_mu.assign(noSamplingTimes_,0);
+
+  for (int j = 0; j < noSamplingTimes_; j++){
+    for (int i = 0; i < noEnsembles_ ; i++){
+      x_mu[j] = x_mu[j] + 1.0 * store_dx[i][j] / noEnsembles_;
+      y_mu[j] = y_mu[j] + 1.0 * store_dy[i][j] / noEnsembles_;
+      z_mu[j] = z_mu[j] + 1.0 * store_dz[i][j] / noEnsembles_;
+    }
+  }
+
+}
+
+
 
 inline void Save::computeError(const std::vector<std::vector<double> >& store,
                                const std::vector<double>& msd,
                                std::vector<double>& sigma){
   //save and return (by reference&) the error to the msd-vector
-  sigma.assign(maxElement_,0);
+  sigma.assign(noSamplingTimes_,0);
 
   //don't use the "ensemble_" variable as iteration limit, since we will
   //remove trajectories (ensembles) in the jackknife implementation.
   const int ensembles = store.size();
 
-  for (int j = 0; j < maxElement_; j++){
+  for (int j = 0; j < noSamplingTimes_; j++){
     for (int i = 0; i < ensembles; i++){
       sigma[j] += pow (pow(store[i][j],2) - msd[j] ,2);
     }
@@ -1100,26 +1214,31 @@ void Save::computeHmatrix(const std::vector<std::vector<double> >& trajectories,
               << "H-matrix will be singular (first row and column =0)"
               << std::endl;
 
-  std::cout << "\n computing H-matrix ..." << std::endl;
+  std::cout << "computing H-matrix ..." << std::endl;
 
   //if we use this function when bootstrapping, and for some reason don't
   //want the same number of bootstrapped sythetic simulations, as ensembles:
-  //(otherwivse we could use the global "ensembles_" variable)
+  //(otherwivse we could use the global "noEnsembles_" variable)
   int ensembles = trajectories.size();
 
   //set Hmatrix to 0
   std::vector<double> temp;
-  temp.assign(maxElement_,0);
-  Hmatrix.assign(maxElement_,temp);
+  temp.assign(noSamplingTimes_,0);
+  Hmatrix.assign(noSamplingTimes_,temp);
 
-  for(int i = 0; i < maxElement_; i++){
-    for(int j = 0; j < maxElement_; j++){
+  //initiate class, to print progress to screen,
+  RemainingTime computationProgress(noSamplingTimes_);
+
+  for(int i = 0; i < noSamplingTimes_; i++){
+
+    //print remaining progress to screen:
+    computationProgress.printProgress(i);
+
+    for(int j = 0; j < noSamplingTimes_; j++){
       for(int k = 0; k < ensembles; k++){
-
         Hmatrix[i][j] += 1.0 / (ensembles-1) *
           ( pow( trajectories[k][i],exponent) - msd[i] ) *
           ( pow( trajectories[k][j],exponent) - msd[j] );
-
       }
     }
   }
@@ -1145,8 +1264,8 @@ void Save::printHmatrix(const std::vector<std::vector<double> >& matrix,
   ofstream dumpMatrix;
   dumpMatrix.open(outputFile.c_str());
 
-  for (int i = 0; i < maxElement_; i++){
-    for (int j = 0; j < maxElement_; j++)
+  for (int i = 0; i < noSamplingTimes_; i++){
+    for (int j = 0; j < noSamplingTimes_; j++)
       dumpMatrix  << matrix[i][j] << "\t";
 
     dumpMatrix << std::endl;

@@ -6,7 +6,7 @@ OPTFLAGS = -O2
 EXECUTABLE = prog
 
 BASIC_SOURCES = lattice.cpp classes.cpp auxiliary.cpp save.cpp
-SUPER = superInteraction.cpp superInteraction.h superProg.cpp
+SUPER = superInteraction.cpp superInteraction.h main_super.cpp
 SOURCES = $(BASIC_SOURCES) main.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 SOURCES2 = $(BASIC_SOURCES) main_thread.cpp
@@ -23,7 +23,7 @@ thread: $(OBJECTS2)
 $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LFLAGS) $(OBJECTS) -o $@
 
-save.o: save.h save.cpp auxiliary.o
+save.o: save.h save.cpp auxiliary.o classes.o
 	$(CC) $(CFLAGS) save.cpp
 
 lattice.o: lattice.cpp lattice.h classes.o auxiliary.o
@@ -38,8 +38,8 @@ auxiliary.o: auxiliary.cpp auxiliary.h
 super: $(BASIC_SOURCES:.cpp=.o) $(SUPER:.cpp=.o)
 	$(CC) $(LFLAGS) $(BASIC_SOURCES:.cpp=.o) $(SUPER:.cpp=.o) -o $@
 
-superProg.o: superProg.cpp save.o auxiliary.o classes.o superInteraction.o
-	$(CC) $(CFLAGS) superProg.cpp
+main_super.o: main_super.cpp save.o auxiliary.o classes.o superInteraction.o
+	$(CC) $(CFLAGS) main_super.cpp
 
 superInteraction.o: superInteraction.cpp superInteraction.h lattice.o classes.o auxiliary.o
 	$(CC) $(CFLAGS) superInteraction.cpp

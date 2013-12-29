@@ -20,8 +20,12 @@ private:
   //Switch between the two stdErr-functions above.
   bool lowMem_;
 
+  //needed only for bootknifing over many different staring times
+  //defined through the dimensionless quantity k_t * t.
+  float k_t_;
+
   //print a fourth column of inf. to the out-put file
-  //clould be the pearson correlation coefficient or "z"
+  //could be the pearson correlation coefficient or "z"
   //depending on switch.
   std::vector<double> fourthColumn_;
 
@@ -31,10 +35,14 @@ private:
   std::vector< std::vector<int> > store_dz_;
   std::vector< std::vector<double> > store_dr_;
 
-  int ensembles_;
+  int noEnsembles_;
 
   //Number of elements in time vector (# of sampling points)
-  int maxElement_;
+  int noSamplingTimes_;
+
+  //If we want to change starting time, when performing the fitting
+  //in the bootstrap --> "bootknife" version. Defaults to 0.
+  float minTime_;
 
   //times to compute the MSD. (x-axis)
   std::vector<double> samplingTime_;
@@ -68,12 +76,26 @@ private:
                          const std::vector<double>& dr_err,
                          double& mu, double& sigma_mu);
 
-  //used by hybrid (same as computeMSD, but don't square)
-  inline void computeMean(const std::vector<std::vector<double> >& store,
-                          std::vector<double>& mean);
+  //used by bootknife (same as computeMSD, but don't square)
+  inline void computeMean(const std::vector<std::vector<int> >& store_dx,
+                          const std::vector<std::vector<int> >& store_dy,
+                          const std::vector<std::vector<int> >& store_dz,
+                          std::vector<double>& x_mu,std::vector<double>& y_mu,
+                          std::vector<double>& z_mu);
+
+  //Overloaded function, to test: MSD(t_i) = sum_m [x_i^(m) - <x_i>]^2
+  //i.e. since M != inf  --> <x> != 0.
+  inline void computeMSD(const std::vector<std::vector<int> >& store_dx,
+                         const std::vector<std::vector<int> >& store_dy,
+                         const std::vector<std::vector<int> >& store_dz,
+                         const std::vector<double>& dx_mu,
+                         const std::vector<double>& dy_mu,
+                         const std::vector<double>& dz_mu,
+                         std::vector<double>& msd);
 
   inline void computeMSD(const std::vector<std::vector<double> >& store,
                           std::vector<double>& msd);
+
   inline void computeError(const std::vector<std::vector<double> >& store,
                            const std::vector<double>& msd,
                            std::vector<double>& sigma);
@@ -107,6 +129,9 @@ public:
   //compute correct error in the fitted parameter. Prints result to
   //standard out (i.e. terminal, unless piped)
   void computeJackknife(std::string outName);
+
+  //see comment on k_t_ variable above.
+  void setJumprate(double);
 
 };
 

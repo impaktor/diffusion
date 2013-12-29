@@ -4,7 +4,8 @@
 #include <vector>
 #include <string>
 
-#include "auxiliary.h"      //non-physics stuff. (print messages etc.)
+#include "nr/ran_mod.h"    //need this for the Ran-class below.
+#include "auxiliary.h"     //non-physics stuff. (print messages etc.)
 #include "classes.h"       //various data structures /classes (Jump, Particle)
 
 using namespace std;
@@ -25,23 +26,26 @@ protected:
 
   vector<Particle> pos_;                   //XYZ-position for each particle on the lattice
   Particle pos_0_;                         //Initial position for the tagged particle
-  int nParticles_;                         //Total number of particles
+  int noParticles_;                        //Total number of particles
   int latticeX_, latticeY_, latticeZ_;     //Lattice size
 
   vector<double> samplingTime_;            //times to compute the MSD.
-  int maxElement_;                         //number of times to sample
+  int noSamplingTimes_;                    //number of times to sample
 
   vector<Jump> jumpRate_;                  //jump-rate for each particle and direction
   vector <long double> partialSum_;        //cumulative sum of jump-rates
 
-  int dim_;                                //dimension of lattice (=1 || 2 || 3)
+  unsigned int dim_;                       //dimension of lattice (=1 || 2 || 3)
   bool boundaryFix_;                       //"true" if fix, "false" if periodic
   double timeSum_;                         //Sum of time for each move
 
-  //TODO------------
-  vector<int> dx_,dy_,dz_;                  //pos. of tracer particle for current ensemble
-  vector<double> dr_;                       //pos. of tracer particle for current ensemble
-    //------------
+  vector<int> dx_,dy_,dz_;                 //pos. of tracer particle for current ensemble
+  vector<double> dr_;                      //pos. of tracer particle for current ensemble
+
+  //count number of laps around the lattice (if periodic boundary):
+  int windingNumber_0_x;
+  int windingNumber_0_y;
+  int windingNumber_0_z;
 
   void convertMuToParticle(int, int&, int&);
   void computePartialSum(void);

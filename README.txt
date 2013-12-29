@@ -47,6 +47,7 @@ auxiliary.[h,cpp]   Personal playground with "nifty by unnecessary shit".
                     The most important content is the printError-function,
                     Disregard the rest.
 
+TESTinteraction.cpp old code, just kept for sentimental reasons. 
 
 
 Compiling and the Makefile
@@ -65,6 +66,12 @@ make lines     Returns the total number of lines of code. ( :D )
 
 The Makefile will recompile any files that have been changed and all files that depend on it, thus speeding up the compilation, and always making sure the binary is correctly linked.
 
+
+Hard-coded variables:
+--------------------
+To not use winding number when using periodic boundary conditions, check the commented code in void Lattice::move(). With the use of winding numbers we keep track on how many times the tracer has circled the lattice. 
+
+Generally, hard-coded variables are defined in the head of the implementation (*.cpp) files.
 
 
 Running
@@ -148,8 +155,7 @@ When running huge simulations one could try commenting some of the testing if-st
   Lattice::moveAndBoundaryCheck
   Lattice::vacancyCheck
   Lattice::convertMuToParticle
-Also investigate convertMuToParticle for changing to binary search method. (TODO).
-
+Also investigate convertMuToParticle for changing to binary search method, which I'm kind of already doing. (I split the interval in 3 then in 2, I think...)
 
 
 
@@ -157,13 +163,20 @@ Also investigate convertMuToParticle for changing to binary search method. (TODO
 CHANGE LOG
 ==========
 
+NOTE: think about the k_t_ in save-class!
+
 version 9 (current)
 -------------------
+-implemented "windingnumbers", for use with periodic boundary. One could have it as it is now, with a class-reachable windingnumber for just the tracer particle, alternatively one could add this to the particle class, which would be less hassle, (no need to fiddle about in Lattice::vacancyCheck), only in Lattice:MoveAndBoundaryCheck(), but would require (slightly) more memory. To turn on/off, just (un)/comment the (indicated) code in Lattice::Move 
 -(23/2 -11)To make the Lattice class be able to multi-thread, setting the Ran class (NR 3 ed.) as "static" is not optimal, since we will initiate several instances of the Lattice-class, and static reaches across the class encapsulation and we don't know what happens if two threads try to access the random number generator at the same time. Therefore, we initiate a single non-static random number generator in the class, that is only reachable for the members of that instance of the class. We do this by using initialization list in the class. This makes my simulation non-comparable with previous simulations, since I now only use one seed for each Lattice class instead of three (waiting time, place, and move).
--All previous simulations ever made had the exact same distribution of crowders, i.e. "quenched", now I WILL change this, and start by moving the generation of jumprates to a separate function in the main() function.  
+-Made the bootknife in save.cpp be able to make several fittings with different starting times.
+-All previous simulations ever made had the exact same distribution of crowders, i.e. "quenched", now I WILL/CAN change this [EDIT: first I must get Nakazato to give reasonable results], and start by moving the generation of jumprates to a separate function in the main() function.  
 -Added the 't' flag for setting the tracer jumprate, i.e. not needing to compile 22 
  different binary files. Distribution, and nakazato crowding rate (k_c) is still 
- hard coded. 
+ hard coded.
+-Made the save-class show remaining time when bootstrapping and computing the H-matrix. This called for some minor changes in the RemainingTime-class and also made the save-class depend on classes.[cpp,h].
+-my super-interaction code from this summer was probably broken many versions ago by modifications in various classes. Now it works, and is renamed (main_super.cpp), and is directly based on main.cpp
+
 
 
 version 8 (15/2 2011)
@@ -222,7 +235,7 @@ a new algorithm to set the sampling times! The simulation result is
 still the same, physically, but not truly identical.
 
 -Changed the calculation of average diffusion constant to omit the
-tagged particle.
+tracer particle.
 -Activated the LowMem command flag ('-m')
 -Resolved the spaghetti that was my sampling time code. In doing so,
 removed get_[dx,dy,dz,dr], set_dt, etc, and other garbage

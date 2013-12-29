@@ -10,8 +10,8 @@ Particle::Particle(int X, int Y, int Z){
   x = X;
   y = Y;
   z = Z;
-}
 
+}
 
 Direction::Direction(double right, double left){
     r = right;
@@ -65,9 +65,22 @@ void RemainingTime::printProgress(unsigned int ensemble){
   std::cout<<"\r";
 
   //Print again!
-  std::cout << "#" << std::setw(5) << procentage << " %  REMAINING ENSEMBLES:"
+  std::cout << "#" << std::setw(5) << procentage << " %  Remaining:"
             << std::setw(6) << ensemblesLeft << " Time (min): " << std::fixed
             << std::setprecision(1) << remaining << std::flush;
+
+  //If it's the last step, finish it off by removing the line.
+  if (ensemble == totalEnsembles_ -1){
+    //move to begining of line
+    std::cout<<"\r";
+
+    //clean the line:
+    std::cout << "                                           " << std::flush;
+
+    //move to begining of the clean line
+    std::cout<<"\r";
+
+  }
 
   /*
 "If you are writing to stdout or cout or clog remember to fflush or std::flush
@@ -75,6 +88,5 @@ the stream to make it output the line immediately. If you are writing to stderr
  or cerr then the stream is unbuffered and all output is immediate (and
 inefficient)."
   */
-
 }
 

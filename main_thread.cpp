@@ -6,7 +6,7 @@
 
 //Random number generator from numerical recipes 3 ed, but
 //modified not to depend on nr.h since that breaks boost::thread
-#include "nr/ran_mod.h"
+//#include "nr/ran_mod.h"
 
 #include "auxiliary.h" //non-physics stuff. (print messages etc.)
 #include "classes.h"   //various data structures /classes (Jump, Particle)
@@ -27,10 +27,10 @@
 
 const double SEED_JUMP     = 17;    //usually: 17
 
-const double SEED_LATTICE1 = 1645;  //15, 87, 64, 32
-const double SEED_LATTICE2 = 8457;
-const double SEED_LATTICE3 = 614;
-const double SEED_LATTICE4 = 3902;
+const double SEED_LATTICE1 = 15;    //usually: 15,87,64,32
+const double SEED_LATTICE2 = 87;
+const double SEED_LATTICE3 = 64;
+const double SEED_LATTICE4 = 32;
 
 void computeJumpRates(vector<Jump>&, float&, const int,
                       const float, const float);
@@ -175,9 +175,9 @@ int main(int argc, char* argv[]){
 
       if (!quiet)  printToScreen.printProgress(E);
 
-      //crowd1.place();
-      //crowd1.move();
-      //++E;
+      // crowd1.place();
+      // crowd1.move();
+      // ++E;
 
       boost::thread thrd1(&Lattice::generateTrajectory, &crowd1,boost::ref(E));
       boost::thread thrd2(&Lattice::generateTrajectory, &crowd2,boost::ref(E));
@@ -231,7 +231,7 @@ int main(int argc, char* argv[]){
     if(interactOn){//INTERACTION
       //print a histogram of clusters
       //crowd.saveBinning(ensemble);
-    }//BUG Augusti, gar otroligt trogt med denna!
+    }//Bug-Warning very slow! (august 2010)
 
 
     //To print which distribution we used to head of output-file
@@ -266,6 +266,9 @@ int main(int argc, char* argv[]){
       //bootstrap the shit out of this. Note, the bootstrapped
       //output files can be destingushed from the "real" simulation
       //by them ending with a number i: {0 < i < (noOutFiles - 1)}
+
+      save.setJumprate(jumpRates[0].x.r);
+
       save.computeBootstrap(nameOfOutFile, noOutFiles, head);
     }
 
@@ -277,8 +280,11 @@ int main(int argc, char* argv[]){
 
   }  //END: of loop for re-running the simulation
 
+
   return 0;
 }
+
+
 
 
 

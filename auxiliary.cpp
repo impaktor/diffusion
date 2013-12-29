@@ -136,7 +136,7 @@ T getNonCommentInput(void){
   //this will ignore any line containing "#", since it
   //only wants numbers.
 
-  char invalue[999];
+  char invalue[9999];
 
   for(bool repeat = true; repeat;){
     std::cin >> invalue;

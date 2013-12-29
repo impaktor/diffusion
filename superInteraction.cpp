@@ -3,9 +3,6 @@
 #include <vector>          //för vektorklassen
 #include <cmath>           //för pow-, sqrt-funktionerna
 
-#include "nr/nr3.h"
-#include "nr/ran.h"        //Random number generator from nummerical recipes 3ed
-
 #include "auxiliary.h"
 #include "lattice.h"
 #include "superInteraction.h"
@@ -21,9 +18,12 @@ using namespace std;
 
 //have the constructor for the SuperInteraction-class initiate the constructor
 //of the lattice-class:
+
+
 SuperInteraction::SuperInteraction(int xSquare,int ySquare,int zSquare,
-                             int particleNumber,bool boundary,float interaction)
-  : Lattice(xSquare,ySquare,zSquare, particleNumber, boundary){
+                                   int particleNumber, double seed,
+                                   bool boundary,float interaction)
+: Lattice(xSquare,ySquare,zSquare, particleNumber, seed, boundary){
 
   //other specific stuff for my SuperInteraction-code.
   interactionStrength_ = interaction;
@@ -34,7 +34,8 @@ void SuperInteraction::setInteraction(float interaction){
   //override the lattice-version, since using that version
   //would be fatal. This one doesn't do anything, other than
   //overriding the former.
-  cout << "Not using setInteraction()-function" << endl;
+  cout << "Not using setInteraction()-function"
+       << "interaction strength is set in constructor" << endl;
   //interactionStrength_ = interaction;
 
 }
@@ -69,7 +70,7 @@ void SuperInteraction::controlVacancyCheck3(int n){
   //It's run before setting the new site as occupied, to make sure it was
   //vacant before the move...
 
-  if (n < nParticles_ && 0 <= n){
+  if (n < noParticles_ && 0 <= n){
     if (vacancy_[pos_[n].x][pos_[n].y][pos_[n].z] != -1){  //if occupied
       cout << endl << "Occupied (" << pos_[n] << ")" << endl;
       printError("Two particles on same site.");
@@ -177,7 +178,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
 
     //print all occupied sites to screen:
     cout<<"Lattice configuration is:"<<endl;
-    for(int i = 0; i < nParticles_; i++){
+    for(int i = 0; i < noParticles_; i++){
       cout << "particle " << i << ": " << pos_[i].x <<", " << pos_[i].y;
       if(dim_ == 3) cout <<", "<< pos_[i].z; cout << endl;
     }
@@ -186,10 +187,10 @@ void SuperInteraction::superInteractionCode(int n, int direction){
     //TEST
     //the purpose is just to give each run a unique label,
     //it helps when debugging.
-    static Ran Random2(69865);
     double Test_Random_number;
-    Test_Random_number = Random2.doub();
-    cout << "random label for this run: " << (double)Test_Random_number << endl;
+    Test_Random_number = randomNumber.doub();
+    cout << "random label for this run: "
+         << (double) Test_Random_number << endl;
 
     if(Test_Random_number <= 0.883078 && Test_Random_number >= 0.883076) {
       cout << "Bug number 2";
@@ -202,7 +203,6 @@ void SuperInteraction::superInteractionCode(int n, int direction){
     if(Test_Random_number <= 0.842700 && Test_Random_number >= 0.842690) {
       cout << "Bug number 4";
 
-      //0.690199
     }
 
   }
@@ -213,8 +213,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
   countNeighbours(pos_[n], cluster);
   double V = interactionStrength_;  //interaction energy /(k_B*T) (V > 0)
 
-  static Ran Random(56);
-  double Rand_numb;
+  double randomNum;
 
   if (cluster.size() == 0){ //TODO change to empty()
     //accept move
@@ -286,8 +285,8 @@ void SuperInteraction::superInteractionCode(int n, int direction){
       abort();
     }
 
-    Rand_numb = Random.doub();
-    if (Rand_numb > P){
+    double randomNumb = randomNumber.doub();
+    if (randomNumb > P){
       //Don't move the cluster if (P<r):
       //Nothing needs to be done, vacancy-matrix unchanged. If
       //cluster.size()=1, then P=1, and we will always move the particle.
@@ -419,9 +418,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
 
         double P = (double) sumCluster / (sumBlocking + sumCluster);
 
-        static Ran something(681);
-        double slump;
-        slump = something.doub();
+        double slump = randomNumber.doub();
         if(slump <= P ){
           /*Move Cluster and All the Blocking particles. But beware
             when we move the cluster and update the vacancy matrix we
@@ -916,7 +913,7 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
 
   vector<int> unique;
   vector<int> NewParticleAdded;
-  static Ran RandomNUM(42);
+
   double random_number;
 
   //n included with 100 % probability:
@@ -946,7 +943,7 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
       }
       if(SingleValued){
         //Add the new particle, with Boltzmans consent...
-        random_number = RandomNUM.doub();
+        random_number = randomNumber.doub();
         if (random_number > exp(-1.0*Exponent)){
           unique.push_back(BuildClusterVector[j]);
           NewParticleAdded.push_back(BuildClusterVector[j]);
@@ -978,7 +975,7 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
   }
 
   //TEST
-  for (int i = 0; i < nParticles_; i++){
+  for (int i = 0; i < noParticles_; i++){
     if (pos_[i].x == 0 || pos_[i].y == 0 || pos_[i].z == 0)
       printError("Outside the lattice!");
   }
@@ -1008,7 +1005,7 @@ void  SuperInteraction::moveAndBoundaryCheck(int n, int R){
   //rules (fix (1) or periodic (0)), IF the new site is vacant.
   bool boundary = boundaryFix_;
 
-  if (0 <= n && n < nParticles_ ){
+  if (0 <= n && n < noParticles_ ){
     if (testOnOff_) cout <<"Moving particle "<< n <<endl;
     // n = particle to move, R = direction to move, such that:
     //      R= 0 = X-right,      1 = X-left
@@ -1075,10 +1072,10 @@ void  SuperInteraction::moveAndBoundaryCheck(int n, int R){
 void SuperInteraction::move(){
 
   double tau;      //waiting time
-  int i = 0;      //index of samplingTime-vector
+  int i = 0;       //index of samplingTime-vector
   timeSum_ = 0;
 
-  while(timeSum_ < samplingTime_[maxElement_-1]){ // "-1" since we start on 0.
+  while(timeSum_ < samplingTime_[noSamplingTimes_-1]){ // "-1" since we start on 0.
     //The time-sampling was completely rewritten in late August 2010
     //to resolve the spaghetti that was the previous version. This
     //follows the Gillespie_exclusion2.cpp-implementation closely, to
@@ -1088,7 +1085,7 @@ void SuperInteraction::move(){
 
     //Save displacement if next time-step is beyond next sampling time
     while(timeSum_ <= samplingTime_[i] &&
-          samplingTime_[i] < timeSum_ + tau  && i < maxElement_){
+          samplingTime_[i] < timeSum_ + tau  && i < noSamplingTimes_){
 
       //save displacement (from previous step)
       dx_[i] = pos_[0].x - pos_0_.x;
@@ -1102,7 +1099,7 @@ void SuperInteraction::move(){
     /*
     //TEST (this is similar to what my spaghetti code used:)
     if(timeSum_ <= samplingTime_[i] &&  samplingTime_[i] < timeSum_ + tau &&
-    i < maxElement_){
+    i < noSamplingTimes_){
 
     //save displacement (from previous step)
     dx[i] = pos_[0].x - pos_0.x;
@@ -1120,17 +1117,17 @@ void SuperInteraction::move(){
     if (partialSum_.empty())
       printError("Partial-sum vector has not been initiated");
 
-    static Ran randomNumb(8);
-    double r2;
+
+    double r2;          //store random number here
 
     int mu_guess;                       // must be integer. (index of vector)
     int mu_left = 0;
-    int mu_right = dim_*2*nParticles_;
+    int mu_right = dim_*2*noParticles_;
     double p_left = (double) partialSum_.front();  //value in first element ( =0 )
     double p_right = (double) partialSum_.back();  //value in last element ( =dim_*2*N)
 
     do{
-      r2 = randomNumb.doub();
+      r2 = randomNumber.doub();
     }while( r2 == 1 || r2 == 0 );
 
     double p_rand = (double) r2*partialSum_.back();
@@ -1172,9 +1169,9 @@ void SuperInteraction::move(){
     //transforms the index mu to which particle to move
     //(index n, by reference) and in which direction,by returning
     //an integer 0<= r <= 5 (in 3D)
-    r = convertMuToParticle(mu,n);
+    convertMuToParticle(mu,n,r);
 
-    //use this one instead of moveAndBoundaryCheck():
+    //use this one instead of Lattice::moveAndBoundaryCheck():
     superInteractionCode(n,r);
 
     timeSum_ = timeSum_ + tau;

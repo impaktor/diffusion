@@ -31,6 +31,13 @@ public:
   int y;
   int z;
 
+  //keep track of how many laps it's made around the lattice
+  //for periodic boundary condition. (only use this (temporary?) in
+  //Lattice::moveAndBoundaryCheck and Lattice::move)
+  // int windingNumber_x;    //can take both neg. and pos. numbers.
+  // int windingNumber_y;
+  // int windingNumber_z;
+
   Jump rate;        //jump rate: rate.x.r
 
   //This allows us to print x,y,z with the << operator

@@ -7,12 +7,10 @@
 //Random number generator from numerical recipes 3 ed, but
 //modified not to depend on nr.h since that breaks boost::thread
 //#include "nr/ran_mod.h"
-//Not needed any more, (compilation error about it being included twice),
-//since I have it in lattice.h which in turn is included here.
 
 #include "auxiliary.h" //non-physics stuff. (print messages etc.)
 #include "classes.h"   //various data structures /classes (Jump, Particle)
-#include "lattice.h"   //this is the main class, that does the physics.
+#include "superInteraction.h"   //this is the main class, that does the physics.
 #include "save.h"      //class to save MSD, compute errors, and print to file
 
 #include <sstream>     //XXX temp (multiple output-files)
@@ -24,12 +22,12 @@
 //                                    2 = power-law, 3 = nakazato
 #define JUMPRATE_TRACER  1          //default value
 #define JUMPRATE_CROWDER 0.5        //(if nakazato-distribution)
-#define FIXBOUNDARY      0          //1=fix wall, 0=periodic boundary
+#define FIXBOUNDARY      0          //MUST BE PERIODIC FOR SUPER, OR ELSE....
 #define EXPONENTAIL_WAITING_TIME 1
 
 const double SEED_JUMP     = 17;    //usually: 17
 
-const double SEED_LATTICE1 = 15;    //usually: 15,87,64,32
+const double SEED_LATTICE1 = 15;
 //const double SEED_LATTICE2 = 87;
 //const double SEED_LATTICE3 = 64;
 //const double SEED_LATTICE4 = 32;
@@ -54,7 +52,7 @@ int main(int argc, char* argv[]){
   string nameOfOutFile = "out.dat"; //default output name
   int noOutFiles = 1;               //only run one simulation (1 output file)
   int interactStr = 0;              //interaction strenth
-  bool interactOn = false;          //don't use the interaction algorithm
+  bool interactOn = true;           //ONLY USE SINCE argumentfl..() want's it
   bool jackknife = false;           //if true: use jackknife, take lots of time
   char method;                      //use bootstrap ('b') or Brute force ('B')
   float jumpTracer = JUMPRATE_TRACER; //k_t
@@ -71,7 +69,7 @@ int main(int argc, char* argv[]){
   AskUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
 
   //Initiate the Lattice class, which is what does all the physics.
-  Lattice crowd1(X,Y,Z,N,SEED_LATTICE1,fixBoundaryOn);
+  SuperInteraction crowd1(X,Y,Z,N,SEED_LATTICE1,fixBoundaryOn,interactStr);
   // Lattice crowd2(X,Y,Z,N,SEED_LATTICE2,fixBoundaryOn);
   // Lattice crowd3(X,Y,Z,N,SEED_LATTICE3,fixBoundaryOn);
   // Lattice crowd4(X,Y,Z,N,SEED_LATTICE4,fixBoundaryOn);
@@ -123,14 +121,6 @@ int main(int argc, char* argv[]){
     // crowd2.setSamplingTimes(samplingTimes, expWaitingTime);
     // crowd3.setSamplingTimes(samplingTimes, expWaitingTime);
     // crowd4.setSamplingTimes(samplingTimes, expWaitingTime);
-
-    //use Interaction algorithm, with InteractStr
-    if(interactOn){
-      crowd1.setInteraction(interactStr);
-      // crowd2.setInteraction(interactStr);
-      // crowd3.setInteraction(interactStr);
-      // crowd4.setInteraction(interactStr);
-    }
 
 
     float jumpCrowders = JUMPRATE_CROWDER;  //k_c (only if Nakazato)
@@ -190,22 +180,6 @@ int main(int argc, char* argv[]){
       // thrd2.join();
       // thrd3.join();
       // thrd4.join();
-
-      //make a print out of individual ensemble:
-      //crowd.dumpSimulation(E);
-
-      // //TEST: to get a snapshot close to the MaxTime
-      // if(totalTime >= MaxTime-0.01){
-      //   crowd.Snapshot();
-      //   cout << "totalTime:" << totalTime << endl;
-      // }
-
-
-      // TODO: ej uppdaterad efter min move()-implementering!
-      //  if(InteractOn){//INTERACTION
-      //     This is just to save the information of cluster-size distribution
-      //     crowd.saveCluster(totalTime);
-      // }//BUG Augusti, gar otroligt trogt med denna!
 
 
       //Store tracer position at each point for this ensemble, needed by
@@ -290,50 +264,6 @@ int main(int argc, char* argv[]){
 
 
 
-/*
-  LEFT TO DO:
-  ----------
-  -remove various testing-loops
-  -plot directly with gnuplot.
-  -remove the set_interaction --> constructor! (doesn't work)
-  -rename all variables using camelCase
-  -kanske ha en MSD-klass, double x y z r?
-  -kompilera med -Wall -pedantic
-  -use __LINE__ to print line-number where error occured
-  -use exceptions perhaps?
-  -compare NRvector vs std::vector, for speed?
-*/
-
-//There are various testing functions in here, but they are either silenced by
-//use of if-statements in combination with a boolean "test" variable set to
-//false, or just commented out. A lot of work went into testing the output,
-//therefore some things can seem redundant, such as printing un-squared
-//displacements (<dx>~0) etc.
-
-/*
-
-  OUTLINE OF THE FUNCTION CALLS OF THIS PROGRAM:
-  ---------------------------------------------
-
- With                      Without
- Interaction:              Interaction:
- -----------               ------------
- main()                     main()
-  |                          |
- move()                     move()
-  |                          |
- moveAndBoundaryCheck()     moveAndBoundaryCheck()
-  |                          |
- vacancyCheck()             vacancyCheck()
-  |                          |
- Interaction()               |
-  |                          |
- CountNeighbors()            |
-  |                          |
-  |                          |
- [make the actual move]     [make the actual move]
-
-*/
 
 
 void computeJumpRates(vector<Jump>& hopRate, float& info, const int N,

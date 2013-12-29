@@ -14,7 +14,7 @@ private:
   void superInteractionCode(int, int);
 
   double SumFrictionCoefficient(std::vector<int>);  //sum over many particles
-  double SumFrictionCoefficient(int);          //sum over one particle
+  double SumFrictionCoefficient(int);               //sum over one particle
 
   void calculateExtent(std::vector<int>&, int, int&, int&);
 
@@ -27,13 +27,13 @@ private:
 
   void controlVacancyCheck3(int );
 
-  void moveAndBoundaryCheck(int, int);   //override function.
+  void moveAndBoundaryCheck(int, int);   //overload function.
 
 
 public:
-  SuperInteraction(int,int,int, int, bool, float);
-  void move(void);  //override the lattice-class version
-  void setInteraction(float); //don't actually use this one, thus redefine it.
+  SuperInteraction(int,int,int, int, double, bool, float);
+  void move(void);              //overload the lattice-class version
+  void setInteraction(float);   //don't actually use this one, thus redefine it.
 
 };
 
