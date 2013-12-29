@@ -24,8 +24,8 @@ private:
   //defined through the dimensionless quantity k_t * t.
   float k_t_;
 
-  //print a fourth column of inf. to the out-put file
-  //could be the pearson correlation coefficient or "z"
+  //print a fourth column of information. to the out-put file:
+  //either the pearson correlation coefficient or "z"
   //depending on switch.
   std::vector<double> fourthColumn_;
 

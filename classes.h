@@ -2,7 +2,7 @@
 #define CLASSES_H
 
 //#include <iostream>        //for cout, among others
-#include<time.h>
+#include <time.h>
 
 //First three classes (Direction, Jump, Particle), will allow us to
 //get the position of a Particle object as: object.x, and the jump
@@ -10,8 +10,9 @@
 
 class Direction{
 public:
-  Direction(double right,double left);
-  Direction(void){};
+  Direction(double right, double left);
+  Direction(const Direction&);            //copy constructor
+  Direction(void);                        //empty constructor
   double r;  //right
   double l;  //left
 };
@@ -25,9 +26,10 @@ public:
 
 class Particle{
 public:
-  Particle(int,int,int);
-  Particle(void){};
-  int x;            //position x
+  Particle(int,int,int);  
+  Particle(const Particle&);              //copy constructor
+  Particle(void);                         //empty constructor
+  int x;                                  //position x
   int y;
   int z;
 
@@ -44,6 +46,10 @@ public:
   //like: Particle particle(1,4,2);  cout << particle <<endl;
   friend std::ostream& operator<< (std::ostream &out, Particle &particle);
   friend std::istream& operator>> (std::istream &in, Particle &particle);
+
+  //assignment operator:
+  Particle & operator=(const Particle &);
+
 };
 
 

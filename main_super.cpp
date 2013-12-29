@@ -13,7 +13,7 @@
 #include "superInteraction.h"   //this is the main class, that does the physics.
 #include "save.h"      //class to save MSD, compute errors, and print to file
 
-#include <sstream>     //XXX temp (multiple output-files)
+#include <sstream>    
 
 //#include <boost/thread/thread.hpp>
 
@@ -50,6 +50,7 @@ int main(int argc, char* argv[]){
   bool useLowMem = false;           //don't save memory
   bool quiet = false;               //print simulation progress to screen
   string nameOfOutFile = "out.dat"; //default output name
+  string nameOfInFile;               //use input file
   int noOutFiles = 1;               //only run one simulation (1 output file)
   int interactStr = 0;              //interaction strenth
   bool interactOn = true;           //ONLY USE SINCE argumentfl..() want's it
@@ -57,16 +58,22 @@ int main(int argc, char* argv[]){
   char method;                      //use bootstrap ('b') or Brute force ('B')
   float jumpTracer = JUMPRATE_TRACER; //k_t
 
+
   //change default values depending on arg. flags given on cmdline.
-  argumentFlags(argc,argv,logscale,useLowMem,interactOn,quiet,interactStr,
-                nameOfOutFile, noOutFiles, method,jackknife, jumpTracer);
+  argumentFlags(argc,argv,logscale,useLowMem,interactOn,quiet,
+                interactStr, nameOfOutFile, nameOfInFile, noOutFiles,
+                method,jackknife, jumpTracer);
 
   if (fixBoundaryOn)
     cout << "# Fix boundary" << endl;
   else
     cout << "# Periodic boundary" << endl;
 
-  AskUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
+  //get the simultion parameters:
+  if (nameOfInFile.empty())
+    askUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
+  else
+    readInputFile(nameOfInFile,X,Y,Z,N,ensemble,antalPunkter,maxTime);
 
   //Initiate the Lattice class, which is what does all the physics.
   SuperInteraction crowd1(X,Y,Z,N,SEED_LATTICE1,fixBoundaryOn,interactStr);

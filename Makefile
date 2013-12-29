@@ -12,7 +12,7 @@ OBJECTS = $(SOURCES:.cpp=.o)
 SOURCES2 = $(BASIC_SOURCES) main_thread.cpp
 OBJECTS2 = $(SOURCES2:.cpp=.o)
 MY_HEADERS = classes.h auxiliary.h lattice.h save.h
-ALL_FILES = $(SOURCES) $(MY_HEADERS) $(SUPER) nr/* Makefile README.txt TESTinteraction.cpp main_*
+ALL_FILES = $(SOURCES) $(MY_HEADERS) $(SUPER) nr/* Makefile README.txt main_thread.cpp
 
 
 all: $(EXECUTABLE)

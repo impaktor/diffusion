@@ -1,3 +1,6 @@
+#ifndef RAN_MOD_H
+#define RAN_MOD_H
+
 typedef unsigned long long int Ullong;
 
 struct Ran {
@@ -135,3 +138,4 @@ struct Ranlim32 {
 	}
 };
 
+#endif

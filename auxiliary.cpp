@@ -1,7 +1,10 @@
 #include <iostream>        //for cout, among others
 #include <cstdlib>         //for abort()-function
-#include <cstring>         //strcpy, strchr
 #include <string>
+#include <fstream>
+#include <vector>
+#include <sstream>
+
 
 #include "auxiliary.h"
 
@@ -11,11 +14,14 @@
 //function uses.
 void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
                    bool& interactionON, bool& quiet, int& interactionStrength,
-                   std::string& returnFileName, int& noRuns, char& nMethod,
-                   bool& jackknife, float& tracer){
+                   std::string& outputFileName, std::string& inputFileName,
+                   int& noRuns, char& nMethod, bool& jackknife, float& tracer){
 
-  char* fileName = NULL;
-  bool changedFileName = false;
+  char* writeFileName = NULL;        //output file-name
+  char* readFileName = NULL;         //output file-name
+  bool changedWriteFileName = false; //if output file-name changed
+  bool changedReadFileName = false;  //if input file-name changed
+
   bool error = false;
 
   //make sure we only set -b or -B, not both!
@@ -24,7 +30,7 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
   int c;
   opterr = 0;
 
-  while((c = getopt(argc,argv,"lhqmw:i:jB:b:t:")) != -1)
+  while((c = getopt(argc,argv,"lhqmw:r:i:jB:b:t:")) != -1)
     switch (c){
     case 'l':
       logarithm = true;
@@ -33,14 +39,18 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
       lowMem = true;
       break;
     case 'h':
-      printHelp(returnFileName,argv);
+      printHelp(outputFileName,argv);
       break;
     case 'q':
       quiet = true;
       break;
     case 'w':
-      fileName = optarg;
-      changedFileName = true;
+      writeFileName = optarg;
+      changedWriteFileName = true;
+      break;
+    case 'r':
+      readFileName = optarg;
+      changedReadFileName = true;
       break;
     case 'i':
       interactionStrength = atoi(optarg);
@@ -102,16 +112,16 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
 
 
   //if none of the above specified arguments were passed:
-  //take the first as new fileName, and print the rest as
+  //take the first as new writeFileName, and print the rest as
   //errors
   int index;
-  bool more_than_one_invalid_argument = (changedFileName) ? true : false;
+  bool more_than_one_invalid_argument = (changedWriteFileName) ? true : false;
 
   for(index = optind; index < argc; index++){
     //only run first iteration & if we didn't change filename (with w|f)
     if(!more_than_one_invalid_argument){
-      fileName = argv[index];
-      changedFileName = true;
+      writeFileName = argv[index];
+      changedWriteFileName = true;
     }
 
     //run for all invalid arguments except the first one
@@ -121,44 +131,126 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
     more_than_one_invalid_argument = true;
   }
 
-  if(changedFileName){
-    returnFileName = fileName;   //converts c-array to std::string
+  if(changedWriteFileName){
+    outputFileName = writeFileName;   //converts c-array to std::string
     std::cout << "# Default output file changed to: "
-              << returnFileName << std::endl;
+              << outputFileName << std::endl;
   }
+
+  if(changedReadFileName){
+    inputFileName = readFileName;   //converts c-array to std::string
+    std::cout << "# using input file: "
+              << inputFileName << std::endl;
+  }
+
 
 }
 
 
-template <class T>
-T getNonCommentInput(void){
-  //small function to allow comments in the input-file.
-  //this will ignore any line containing "#", since it
-  //only wants numbers.
 
-  char invalue[9999];
+bool isComment(const std::string& line){
 
-  for(bool repeat = true; repeat;){
-    std::cin >> invalue;
-    if(strchr(invalue,'#') == NULL)
-      repeat = false;
+  //if line contains a '#' (anywhere)...
+  unsigned int elementPos = line.find_first_of("#",0);
+  
+  if (elementPos != std::string::npos){
+
+    //...check if it is preceded by ' ', and/or '\t', else not a comment  
+    std::string toPrecedComments = " \t";
+    if (line.find_first_not_of(toPrecedComments) == elementPos)
+      return true;
   }
 
-  return (T) atof(invalue);
+  return false;
+} 
+
+
+template<typename T>
+T convertString(const std::string& string){
+  //this is not optimal, since it does not return the state of the
+  //operation...
+
+  std::istringstream stream(string);
+  
+  T returnValue;
+
+  stream >> returnValue;
+
+  return returnValue;
+
 }
+
+
+void readInputFile(std::string& fileToRead, int& xdim, int& ydim, 
+                   int& zdim, int& particleNumber, int& ensembles,
+                   int& numberOfValues, double& stopTime){
+
+  std::vector<double> store;
+
+  std::ifstream readFile;
+  readFile.open(fileToRead.c_str());
+
+  if (!readFile){
+    std::cerr << "ERROR: cant find " << fileToRead << std::endl;
+  }
+  else{
+
+    std::string readString;
+
+    while(std::getline(readFile,readString)){
+      if (!isComment(readString)){
+
+        double temp = convertString<double>(readString);
+
+        store.push_back(temp);
+      }
+    }
+
+    xdim =            (int) store[0];
+    ydim =            (int) store[1];
+    zdim =            (int) store[2];
+    particleNumber =  (int) store[3];
+    ensembles =       (int) store[4];
+    numberOfValues =  (int) store[5];
+    stopTime =              store[6];
+  }
+
+  //for (int i = 0; i < store.size(); i++)
+  //  std::cout << "check: " << store[i] << std::endl;
+
+}
+
+
+template<typename T>
+T getNonCommentInput(){
+  
+  std::string s;
+
+  //get non-comment line:
+  //(useful when starting the program with: './prog < input.dat')
+  do{
+    getline(std::cin,s);
+  }while(isComment(s));
+  
+  return convertString<T>(s);
+
+}
+
 
 //(return simulation parameters through reference)
-void AskUserForInputParameters(int& xdim, int& ydim, int& zdim,
+void askUserForInputParameters(int& xdim, int& ydim, int& zdim,
                                int& particleNumber, int& ensembles,
                                int& numberOfValues, double& stopTime){
 
   std::cout << "# Specify number of lattice sites in:" << std::endl;
   std::cout << "# X: ";
-  xdim = getNonCommentInput<int>(); //ignore lines containing '#'
+  xdim = getNonCommentInput<int>(); //ignore lines starting with '#'
+
   std::cout << "# Y: ";
-  ydim = getNonCommentInput<int>(); //ignore lines containing '#'
+  ydim = getNonCommentInput<int>(); //ignore lines starting with '#'
+
   std::cout << "# Z: ";
-  zdim = getNonCommentInput<int>(); //ignore lines containing '#'
+  zdim = getNonCommentInput<int>(); //ignore lines starting with '#'
 
   std::cout << "# Total number of particles: ";
   particleNumber = getNonCommentInput<int>();
@@ -176,6 +268,7 @@ void AskUserForInputParameters(int& xdim, int& ydim, int& zdim,
 }
 
 
+
 void printHelp(std::string File, char** argv){
   std::string defaultFileName = File;
   std::cout << "USAGE" << std::endl << "-----" << std::endl;
@@ -186,6 +279,7 @@ void printHelp(std::string File, char** argv){
   std::cout << "-l \t Set log-spacing between data values to be written to\n\t output-file to ON." << std::endl;
   std::cout << "-m\t Use the low memory consuming algorithm for computing std err." << std::endl;
   std::cout << "-w NAME\t Set output-file to 'NAME'." << std::endl;
+  std::cout << "-r NAME\t Set input-file to 'NAME'." << std::endl;
   std::cout << "NAME\t Set first non-valid options-flag as name of output-file.\n \t(shorter/faster version than using the '-w' option)"<<std::endl;
   std::cout << "-q\t Set \"quiet mode\"=true. I.e print less information to the screen." << std::endl;
   std::cout << "-j\t Turn on the jackknife algorithm. The -m flag can not be used in this mode." << std::endl;
@@ -220,124 +314,21 @@ void printHelp(std::string File, char** argv){
 
 }
 
-//====================================================================
-/*#include <fstream>
-  #include <iostream>
-
-  using namespace std;
-
-  int main ( int argc, char *argv[] )
-  {
-  if ( argc != 2 ) // argc should be 2 for correct execution
-  // We print argv[0] assuming it is the program name
-  std::cout<<"usage: "<< argv[0] <<" <filename>\n";
-  else {
-  // We assume argv[1] is a filename to open
-  ifstream the_file ( argv[1] );
-  // Always check to see if file opening succeeded
-  if ( !the_file.is_open() )
-  std::cout<<"Could not open file\n";
-  else {
-  char x;
-  // the_file.get ( x ) returns false if the end of the file
-  //  is reached or an error occurs
-  while ( the_file.get ( x ) )
-  std::cout<< x;
-  }
-  // the_file is closed implicitly here
-  }
-  }
-
-
-*/
-//====================================================================
-
-/*
-  void printGnuplot(char name[], int ToGnuPlot, int ensemble, int distribution){
-  bool logscale = true;
-  ofstream plot;
-
-  double density = Density();
-  double D_eff=DiffEffConstant();
-  double D_naka=Nakazato();
-  double ergo = Ergodicity(latticeX_,latticeY_,latticeZ_);
-
-  plot.open(name);
-  //Lite information:
-  plot <<"# E = "<<ensemble<<"\t N = "<<N<<"\t X-Y-Z: "
-  <<latticeX_<<"x"<<latticeY_<<"x"<<latticeZ_<<"\t concentration="<<density<<std::endl;
-  //TODO: skriv ut vilken fördelning det är på jumprates...
-
-  if (writeToFile){
-  //set size 0.8, 0.8
-  plot<<"set term post color linewidth 1.5"<<std::endl;
-  plot<<"set out \""<<name<<".ps\"  "<<std::endl;
-  }
-  if(logscale) plot<<"set logscale"<<std::endl;
-
-  plot <<"set ylabel \"<r^2>\""<<std::endl;
-  plot <<"set xlabel \"t\""<<std::endl;
-  plot <<"set legend bottom"<<std::endl;
-
-
-  //TODO, manick som skriver vad det är för fördelning.
-  if (distribution==)
-
-  if (dim==1) plot <<"f(x)=((1-"<<density<<")/"<<density<<")*sqrt(4*"<<D_eff<<"*x/pi)"<<std::endl;
-
-  plot <<"e(x)="<<ergo<<std::endl;
-
-  plot <<"n(x)= "<<D_naka<<"*x"<<std::endl;
-
-
-
-  //om vi bill ha kvar plotten på skärmen, vill vi inte stänga filen!
-  if (ToGnuPlot!=2) plot<<"quit"<<std::endl;
-  plot.close();
-  if (ToGnuPlot!=0) system("gnuplot plot.gp");
-
-  //till att börja med: skriv alltd plot.gp-fil
-  //toGnuPlot: 0= ej plotta till skärm eller fil
-  //toGnuPlot: 1= plotta till ps-fil
-  //toGnuPlot: 2= plotta till skärm
-
-  }
-
-*/
-
-/*
-  plot "0-40000-4000.dat" using 1:2 with line title "1D",\
-  0.282/sqrt(x) title "1/sqrt(t)",\
-  "0-200-200-4000-(100).dat" using 1:2 with line title "2D",\
-  0.19*log(x)/x title "ln(t)/t"
-
-
-  plot f(x) title "dens=0.5, D=1/2", 'out.dat' title "100x1x1, N=50"
-  quit
-
-
-  plot f(x), '50x50-ergodicitet.dat' title "50x50x1, N=1"
-
-  f(x)=((1-0.2)/0.2)*sqrt(4*0.258362*x/pi)*(0.2*0.2)
-  plot '1dZeroAndOne.dat' with errorbars, f(x)
-*/
-
-
 
 void printError(std::string message){
-  std::cout <<"\n Error: " << message << std::endl;
+  std::cerr <<"\n Error: " << message << std::endl;
   abort();
 }
 
 //use __FILE__ and __LINE__ macro to get line and filename;
 void printError(std::string message, int line){
-  std::cout <<"\n Error occured at line: " << line
+  std::cerr <<"\n Error occured at line: " << line
        << std::endl << message << std::endl;
   abort();
 }
 
 void printError(std::string message, std::string file, int line){
-  std::cout <<"\n Error occured in file " << file << " at line: " << line
+  std::cerr <<"\n Error occured in file " << file << " at line: " << line
        << std::endl << message << std::endl;
   abort();
 }

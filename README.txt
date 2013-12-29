@@ -1,13 +1,22 @@
 INSTRUCTIONS AND COMMENTS
 =========================
 
-Getting started
----------------
+Getting started with the program
+--------------------------------
+Upon execution, the program will ask for input parameters, if no input-file was specified, (use the '-r' flag). Example:
+  ./prog -w output_42.dat -r input.dat
+  ./prog -w output_42.dat < input.dat
+See below for more options. (or do ./prog -h) 
+
+
+Getting started with the code
+-----------------------------
 If the daunting task of reading the source code has been bestowed upon you, 
 I'd recommend limiting yourself to lattice.[h,cpp] and main.cpp. Do not venture
 in to my own personal playground that is auxiliary.cpp. Also save.[h,cpp] is 
 redundant for understanding the physics that is simulated, and understanding 
 the definitions in classes.[h,cpp] is crucial.
+
 
 Running on many computers
 -------------------------
@@ -40,14 +49,12 @@ save.[h,cpp]    Save routine. During simulation it stores the MSD for each
 
 lattice.[h,cpp] This is where the physics happens.
 
-classes.[h,cpp] Defines the Jump class, which depends on the Direction class.
-                The Particle class is not yet (v.8) used.
+classes.[h,cpp] Defines the Particle class which depends on Jump class,
+                which depends on the Direction class. (in use since version 8)
 
 auxiliary.[h,cpp]   Personal playground with "nifty by unnecessary shit". 
                     The most important content is the printError-function,
                     Disregard the rest.
-
-TESTinteraction.cpp old code, just kept for sentimental reasons. 
 
 
 Compiling and the Makefile
@@ -77,23 +84,24 @@ Generally, hard-coded variables are defined in the head of the implementation (*
 Running
 -------
 For help on command flags and arguments just run the program with the -h flag. For convenience they are given below:
--h         Displays a help.
--m         Use the (much) less memory consuming algorithm. Advisable if 
-           (Number of values to store) x (number of ensembles) / 2^30 ~ RAM (in Gb) 
--l         Use logarithmic spacing of the data points (time sampling points)
--i M       the -i option activates the interaction-algorithm, with "M"
-           being the interaction strength. Note that M >= 0. If M = 0
-           the simulation gives the same result as without, but it will run slower.
--w target  changes the default output file name: "out.dat" to "target",
-           which can include a path and name up to 99 characters long.
--q         Run in "quiet mode", i.e. less printout to screen.
--B N       Generate N different output-files with the same input parameters, 
-           by using bootstrap; after the simulation it generates N synthetic output-files.
--b N       Generate N different output-files with the same input parameters, 
-           by using Brute force, i.e. Just rerun the simulation N times.
--j         Turn on the jackknife algorithm to print out a corrected error to the screen
-           and file appended with "_jackknife"
--t k       Set the tracer jumprate to "k", where "k" is a float. Was previously hard coded.
+-h        Displays a help.
+-m        Use the (much) less memory consuming algorithm. Advisable if 
+          (Number of values to store) x (number of ensembles) / 2^30 ~RAM (in Gb) 
+-l        Use logarithmic spacing of the data points (time sampling points)
+-i M      The -i option activates the interaction-algorithm, with "M"
+          being the interaction strength. Note that M >= 0. If M = 0
+          the simulation gives the same result as without, but it will run slower.
+-w target Write simulation output to 'target' instead of the default "out.dat"
+          (can include a path and name up to 99 characters long).
+-r source Read an input-file instead of asking for simulation parameters.
+-q        Run in "quiet mode", i.e. less printout to screen.
+-B N      Generate N different output-files with the same input parameters, 
+          by using bootstrap; after the simulation it generates N synthetic output-files.
+-b N      Generate N different output-files with the same input parameters, 
+          by using Brute force, i.e. Just rerun the simulation N times.
+-j        Turn on the jackknife algorithm to print out a corrected error to the screen
+          and file appended with "_jackknife"
+-t k      Set the tracer jumprate to "k", where "k" is a float. Was previously hard coded.
 
 Dimension
 ---------
@@ -102,11 +110,7 @@ The program accurately accounts for all dimensions larger than 1. This means tha
 
 Jump-rates
 ----------
-The code has been written so if anyone is so inclined they can have different jump rates in different directions, to allow simulations during some biased/potential influence on the particles. 
-
-setting jump rates in three dimensions if only 2D lattice will ... XXX-TODO-XXX!
-
-
+The code allows for different jump rates in different directions, although this has never been used.
 
 Output-files
 ------------
@@ -120,25 +124,26 @@ to a separate file ("name"_matrix), where "name" is the name of the primary
 out-file (default: out.dat), but this is primarily for testing purpose.
 
 
+
 Coding Conventions
 ------------------
 The code follows the following rules:
 (see http://geosoft.no/development/cppstyle.html)
- ______________________________________________________
-|DESCRIPTION              | EXAMPLE                    |
-|=========================|============================| 
-|All variables:           | camelCase, myVariable      | 
-|-------------------------|----------------------------| 
-|Constants:               | MY_CONSTANT                | 
-|-------------------------|----------------------------| 
-|Private class variables: | camelCase_                 | 
-|-------------------------|----------------------------| 
-|Types:                   | CamelCase, MyType, Particle| 
-|(always a noun)          | Direction, etc.            | 
-|-------------------------|----------------------------| 
-|Functions & methods:     | getVariable(), computeD(), |
-|(always a verb)          | setVariable()              | 
-'______________________________________________________'
+ _______________________________________________________
+|DESCRIPTION               | EXAMPLE                    |
+|==========================|============================| 
+|All variables:            | camelCase, myVariable      | 
+|--------------------------|----------------------------| 
+|Constants:                | MY_CONSTANT                | 
+|--------------------------|----------------------------| 
+|Private class variables:  | camelCase_                 | 
+|--------------------------|----------------------------| 
+|Types:                    | CamelCase, MyType, Particle| 
+|(always a noun, or is it?)| Direction, etc.            | 
+|--------------------------|----------------------------| 
+|Functions & methods:      | getVariable(), computeD(), |
+|(always a verb, ...is it?)| setVariable()              | 
+'_______________________________________________________'
 
 -"Generic variables should have the same name as their type"
 
@@ -165,8 +170,29 @@ CHANGE LOG
 
 NOTE: think about the k_t_ in save-class!
 
-version 9 (current)
--------------------
+TODO: Perhaps remove Lattice:buildCluster2 ? needed by super?
+
+version 10
+----------
+-finally made my superInteraction-code compile. (note to self: "inline" in base-class, not a good idea).
+-cleaning up code, removed a bunch of no longer used functions in main.cpp, some of them are still defined in lattice.[h,cpp] though for use again. 
+-changed vacancy matrix from <int> (4 byte) to <short> (2 byte), only uses half as much RAM!
+-added header to each column in "out.dat_txyz"-file.
+-significant recoding of auxiliary.cpp. Re-wrote getNonCommentInput completely, and it now works, which it did not before.
+-Added a '-r' flag for reading input files (with comments!), I bet Tobias will be happy now...   
+-added copy constructors to Particle:: and Direction:: (even though I'm not using them), and made the void constructor initiate everything to 0, for both Particle, Jump, and Direction -classes.  
+-removed:
+    Lattice::vacancyCheckOld
+    Lattice::moveOlod
+    Lattice::snapshot,
+    Lattice::dumpSimulation,
+    Lattice::saveCluster & Lattice::printCluster (meant to print clustersize-distribution when using interactioon),
+    TESTinteraction.cpp (removed entire file, old code. Not used.)
+-minor changes in Lattice:checkVacancyMatrix
+-removed 3 redundant '#include <...>' in lattice.cpp, and wrote an '#ifndef' in nr/ran_mod.h.
+
+version 9 
+----------
 -implemented "windingnumbers", for use with periodic boundary. One could have it as it is now, with a class-reachable windingnumber for just the tracer particle, alternatively one could add this to the particle class, which would be less hassle, (no need to fiddle about in Lattice::vacancyCheck), only in Lattice:MoveAndBoundaryCheck(), but would require (slightly) more memory. To turn on/off, just (un)/comment the (indicated) code in Lattice::Move 
 -(23/2 -11)To make the Lattice class be able to multi-thread, setting the Ran class (NR 3 ed.) as "static" is not optimal, since we will initiate several instances of the Lattice-class, and static reaches across the class encapsulation and we don't know what happens if two threads try to access the random number generator at the same time. Therefore, we initiate a single non-static random number generator in the class, that is only reachable for the members of that instance of the class. We do this by using initialization list in the class. This makes my simulation non-comparable with previous simulations, since I now only use one seed for each Lattice class instead of three (waiting time, place, and move).
 -Made the bootknife in save.cpp be able to make several fittings with different starting times.
@@ -176,7 +202,7 @@ version 9 (current)
  hard coded.
 -Made the save-class show remaining time when bootstrapping and computing the H-matrix. This called for some minor changes in the RemainingTime-class and also made the save-class depend on classes.[cpp,h].
 -my super-interaction code from this summer was probably broken many versions ago by modifications in various classes. Now it works, and is renamed (main_super.cpp), and is directly based on main.cpp
-
+-Code now uses the Particle-class, which was implemented some time between version 8 & 9. 
 
 
 version 8 (15/2 2011)

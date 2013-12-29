@@ -13,8 +13,8 @@ private:
 
   void superInteractionCode(int, int);
 
-  double SumFrictionCoefficient(std::vector<int>);  //sum over many particles
-  double SumFrictionCoefficient(int);               //sum over one particle
+  double sumFrictionCoefficient(std::vector<int>);  //sum over many particles
+  double sumFrictionCoefficient(int);               //sum over one particle
 
   void calculateExtent(std::vector<int>&, int, int&, int&);
 

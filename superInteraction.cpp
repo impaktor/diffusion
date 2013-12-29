@@ -4,7 +4,6 @@
 #include <cmath>           //för pow-, sqrt-funktionerna
 
 #include "auxiliary.h"
-#include "lattice.h"
 #include "superInteraction.h"
 
 #define VERBOSE 0;
@@ -47,8 +46,7 @@ void SuperInteraction::printPositionToScreen(int particle){
   //containing particle labels, to screen. (Test-function)
   int m;
   m = particle;
-  cout << "Particle " << m << " X:Y:Z "
-       << pos_[m].x <<":" << pos_[m].y << ":" << pos_[m].z << endl;
+  cout << "Particle " << m << " X:Y:Z " << pos_[m] << endl;
 }
 
 void SuperInteraction::printPositionToScreen(vector<int> particle){
@@ -57,10 +55,9 @@ void SuperInteraction::printPositionToScreen(vector<int> particle){
   int m;
   for(int i=0; i < particle.size(); i++){
     m = particle[i];
-    cout << "Particle " << m << " X:Y:Z "
-         << pos_[m].x << ":" << pos_[m].y << ":" << pos_[m].z << endl;
+    cout << "Particle " << m << " X:Y:Z " << pos_[m] << endl;
   }
-  cout<<"Total size: " << particle.size() << endl;
+  cout << "Total size: " << particle.size() << endl;
 }
 
 
@@ -89,7 +86,7 @@ void SuperInteraction::controlVacancyCheck3(int n){
 
 
 
-inline double SuperInteraction::SumFrictionCoefficient(vector<int> cluster){
+inline double SuperInteraction::sumFrictionCoefficient(vector<int> cluster){
   //Function to sum the friction coefficients (inverse jump rate) of
   //all particles in the cluster.
 
@@ -122,7 +119,7 @@ inline double SuperInteraction::SumFrictionCoefficient(vector<int> cluster){
 }
 
 
-inline double SuperInteraction::SumFrictionCoefficient(int particle){
+inline double SuperInteraction::sumFrictionCoefficient(int particle){
   //Function to sum the friction coefficients (inverse jump rate) of
   //all particles in the cluster.
 
@@ -262,8 +259,8 @@ void SuperInteraction::superInteractionCode(int n, int direction){
     //Calculate the friction constant (k^(-1))
 
 
-    double sumCluster =  SumFrictionCoefficient(cluster);
-    double sumParticle =  SumFrictionCoefficient(n);
+    double sumCluster =  sumFrictionCoefficient(cluster);
+    double sumParticle =  sumFrictionCoefficient(n);
 
     testinglite = true; //TEST
     for(int i = 0; i < cluster.size(); i++){
@@ -414,7 +411,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
           cout << endl;
         }
 
-        double sumBlocking = SumFrictionCoefficient(blocking);
+        double sumBlocking = sumFrictionCoefficient(blocking);
 
         double P = (double) sumCluster / (sumBlocking + sumCluster);
 
@@ -1075,7 +1072,8 @@ void SuperInteraction::move(){
   int i = 0;       //index of samplingTime-vector
   timeSum_ = 0;
 
-  while(timeSum_ < samplingTime_[noSamplingTimes_-1]){ // "-1" since we start on 0.
+  while(timeSum_ < samplingTime_[noSamplingTimes_-1]){
+    //"-1" since we start on 0
     //The time-sampling was completely rewritten in late August 2010
     //to resolve the spaghetti that was the previous version. This
     //follows the Gillespie_exclusion2.cpp-implementation closely, to

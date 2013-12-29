@@ -51,9 +51,8 @@ protected:
   void computePartialSum(void);
   void moveAndBoundaryCheck(int,int);
 
-  int vacancyCheckOld(int, Particle);     //No double Occupancy.
   int vacancyCheck(int, const Particle&); //Same as above, but improved. Use this one instead.
-  vector<vector<vector<int> > > vacancy_; //Needed in my more efficient "vacancyCheck()"
+  vector<vector<vector<short> > > vacancy_; //Needed in my more efficient "vacancyCheck()"
 
   float jumpCrowders_, jumpTracer_;        //only used in the Nakazato()-function
   bool testOnOff_;                         //To print detailed information to screen
@@ -67,7 +66,6 @@ protected:
 public:
   Lattice(int, int, int, int, double, bool);
   void place(void);                        //Place particles on the lattice
-  void moveOld(void);                      //old obsolete move-code (no jump-rates)
   void move(void);                         //pick a particle & direction based on jump-rate
   void generateTrajectory(int&);           //same as place() + move()
   int getDimension(void);
@@ -85,18 +83,6 @@ public:
 
   //Set jump-rate of each particle and direction
   void setJumpRate(const vector<Jump>&);
-
-  //Secondary not used functions
-  void snapshot(void);                     //Not used. (more comments in function body)
-  //  double get_dt(void);   //Size of time-step, need it for P(x,t), don't need this...
-
-  //INTERACTION CODE:
-  //TODO hur blir dessa i Save-klassen? Var hör de hemma?
-  void saveCluster(double);                //To get rho(m) (cluster distribution)
-  void printCluster(void);                 //Print  rho(m) (cluster distribution)
-
-  //TEST-Code
-  void dumpSimulation(int);                //dump displacement for individual run to file.
 
 };
 

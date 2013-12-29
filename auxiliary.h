@@ -9,11 +9,14 @@
 //lines, etc.
 
 //only these functions needs to be accessible from the "outside",
-void argumentFlags(int, char**, bool&, bool&, bool&, bool&,
-                   int&, std::string&, int&, char&, bool&, float&);
+void argumentFlags(int, char**, bool&, bool&, bool&, bool&, int&,
+                   std::string&, std::string&, int&, char&, bool&, float&);
 
-void AskUserForInputParameters(int&, int&, int&, int&,
+void askUserForInputParameters(int&, int&, int&, int&,
                                int&, int&, double&);
+
+void readInputFile(std::string&, int&, int&, int&, int&,
+                   int&, int&, double&);
 
 //Prints message, and aborts the program.
 void printError(std::string message);

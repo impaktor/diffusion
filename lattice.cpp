@@ -1,9 +1,6 @@
 #include <iostream>        //for cout, among others
-#include <fstream>         //read write to files
 #include <cstdlib>         //for abort()-function
 #include <cmath>           //gives sqrt, pow, fabs,
-#include <sstream>         //behövs kanske för "ostringstream" i save()-func.
-#include <string>
 #include <vector>
 
 //#include "nr/ran_mod.h"    //Random number generator from numerical recipes 3ed.
@@ -147,9 +144,9 @@ void Lattice::place(void){
   //-----------------------------------
   //initiate the vacancy-vector with "-1" (meaning vacant)
   //Must reset this matrix for each ensemble.
-  vector< vector< vector<int> > >
-    Vacancy(latticeX_+1, vector< vector<int> >
-            (latticeY_+1, vector<int>(latticeZ_+1,-1)));
+  vector< vector< vector<short> > >
+    Vacancy(latticeX_+1, vector< vector<short> >
+            (latticeY_+1, vector<short>(latticeZ_+1,-1)));
   vacancy_ = Vacancy;
   //Mark occupied sites with particle label for that site:
   //note, no change will ever occur to the 0-elements of the matrix,
@@ -159,85 +156,6 @@ void Lattice::place(void){
   }
 }
 
-
-void Lattice::dumpSimulation(int index){
-  //This is a test method to simply "dump" the trajectories
-  //for a single run to file. It is used to check correlations
-  //between different runs.
-
-  //save to file-name dump[i].dat
-  stringstream buffer;
-  buffer << "dump" << index << ".dat";
-
-  ofstream dump;
-  dump.open(buffer.str().c_str());
-
-  for (int i = 0; i < noSamplingTimes_; i++){
-    dump  << samplingTime_[i] << "\t" << dr_[i] << endl;
-  }
-  dump.close();
-}
-
-
-void Lattice::saveCluster(double Time){
-  //This function calculates how many particles are in
-  //the cluster that the tagged particle is part of
-
-  //ha denna funktionen sa att den kors varje tidssteg for sista ensemblen,
-  //Den skall veta nar den ar pa sista tidssteget, tror jag...
-
-  //Cluster_Distribution defined in the constructor.
-  vector<int> Cluster;
-  //TODO kolla Boundary! 0 eller 1?
-
-  //BUG augusti, detta stammer val inte?
-  //ne, men jag har kommenterat ut hela den saken, sa vardet pa
-  //Exponent spellar ingen roll!
-  double Exponent = 0; //ie. rand > 0 always include the neighbor.
-
-  // checkVacancyMatrix(1.01); //OK hit
-
-  if(Time>20){  //The system is not in equilibrium from start
-    //checkVacancyMatrix(10.1);
-    countNeighbours(pos_[0], Cluster);
-    //checkVacancyMatrix(10.2);
-    buildCluster2(0, Cluster, Exponent); //Skriver denna till nagot?
-    //checkVacancyMatrix(10.3); //OK hit
-    int M = Cluster.size();
-    //First element is # of 1-clusters (ie. single particles), etc.
-    clusterDistribution_[M-1] = clusterDistribution_[M-1] + 1.0/noParticles_;
-    // CheckVacancyMatrix(10.4);  //BUG! men inte OK hit!????
-
-  }
-  //CheckVacancyMatrix(10.5);
-
-  //TODO
-  //-normalisering? dela med N*Ensemble?
-  //integrerar man den skall den bli 1 !
-  //hur ofta skall man kolla clusterdistribution?
-  //-knovergens. I borjan skall det vara en forskjutning mot 1
-  //skall sedan stabilisera sig.
-}
-
-
-void Lattice::printCluster(void){
-  //This function prints the information gathered by
-  //the saveCluster()-function, and prints it to file
-
-  //  CheckVacancyMatrix(9);
-
-  if (clusterSize_.size() != clusterDistribution_.size())
-    printError("cluster size incorrect, in printCluster()");
-
-  ofstream clust;
-  char NameOfFiles[] = "cluster.dat";
-  clust.open(NameOfFiles);
-  for(unsigned int j = 0; j < clusterDistribution_.size(); j++){
-    clust << clusterSize_[j] <<"\t"<< clusterDistribution_[j] << endl;
-  }
-  clust.close();
-  cout << "Pinted " << NameOfFiles << endl;
-}
 
 
 void Lattice::checkVacancyMatrix(float ErrorCode){
@@ -252,11 +170,11 @@ void Lattice::checkVacancyMatrix(float ErrorCode){
     int label;
     int count_vacant_sites = 0;
 
-    for (int i=1; i <= latticeX_; i++){
+    for (int i = 1; i <= latticeX_; i++){
       //cout<<"i: "<<i<<endl;
-      for (int j=1; j <= latticeY_; j++){
+      for (int j = 1; j <= latticeY_; j++){
         //cout<<"j: "<<j<<endl;
-        for (int k=1; k <= latticeZ_; k++){
+        for (int k = 1; k <= latticeZ_; k++){
           //cout<<"k: "<<k<<endl;
           label = vacancy_[i][j][k];
           //cout <<"label: "<< label <<endl;
@@ -270,17 +188,15 @@ void Lattice::checkVacancyMatrix(float ErrorCode){
         }
       }
     }
-    //Easier to find exactly where (above/below) error = true
-    if(error) cout << "Does not compute..." << endl;
 
     if (count_vacant_sites != latticeX_*latticeY_*latticeZ_-noParticles_){
-      cout << "Error in vacant sites" << endl
+      cerr << "Error in vacant sites" << endl
            << "# of vacant sites: " << count_vacant_sites << endl;
       error = true;
     }
 
     if(error){
-      cout << "Vacancy Matrix is not correct, at err. code site: "
+      cerr << "Vacancy Matrix is not correct, at err. code site: "
            << ErrorCode << endl;
       abort();
     }
@@ -377,35 +293,6 @@ void Lattice::getDisplacement(vector<int>& dx, vector<int>& dy,
   dy = dy_;
   dz = dz_;
   dr = dr_;
-}
-
-
-void Lattice::moveOld(){
-  //This code is obsolete, as it just works for placing identical
-  //particles, but I keep it for sentimental reasons.
-  //Better safe than sorry.
-
-  int r,n;
-
-  //Choose particle at random, 0 <= n < N
-  do{
-    n = randomNumber.doub() * noParticles_;
-  }while(n == noParticles_);
-
-
-  do{
-    r = randomNumber.doub() * (2 * dim_);
-  }while( r == dim_ * 2 );           //gives 0<=R<2*dim
-
-
-  //Do the actual move, according to the boundary rules
-  moveAndBoundaryCheck(n,r);
-
-  timeSum_ = timeSum_ + 1.0 / noParticles_;  //Calculate the time
-
-  if (testOnOff_)
-    for (int i = 0; i < noParticles_; i++)
-      cout <<" MOVED \n particle n = " << i <<": "<< pos_[i] << endl;
 }
 
 
@@ -552,42 +439,6 @@ void Lattice::moveAndBoundaryCheck(int n, int R){
 
 
 
-int Lattice::vacancyCheckOld(int n, Particle previous){
-  //Old and obsolete version. It doesn't need a 3D matrix as the
-  //new version does, vacancyCheck(...) but this one is slow.
-  //Keep it here to check that the output is exactly identical
-  //(compare output-files with the "diff" command)
-
-  if (n < noParticles_ && 0 <= n){
-
-    int returnvalue = 0;    //unused parameter to register collisions
-    for (int i=0; i<noParticles_; i++){
-      if (pos_[i].x == pos_[n].x && pos_[i].y == pos_[n].y &&
-          pos_[i].z == pos_[n].z && i!=n){
-        if (testOnOff_) cout << "Occupied: " << pos_[n] << endl;
-
-        //if two particles on same square: undo move
-        pos_[n] = previous;
-        returnvalue = 1;
-        return returnvalue;     //End function here
-      }
-      else
-        if (testOnOff_) cout <<"OK"<<endl;
-    }
-    if (testOnOff_) cout << "Vacant, particle "<< n
-                         << ": " << pos_[n] << endl;
-    return returnvalue;
-    //(the returnvalue could be used to have a
-    //    do-move-while(vacancyCheck == 1)
-    //but if so, we need to move this function to be directly
-    //in the Move_()-func.)
-  }
-  else{
-    printError("accessing invalid particle");
-  }
-}
-
-
 
 int Lattice::vacancyCheck(int n, const Particle& oldPos){
   //NOTE: This is a faster version than vacancyCheckOld(), since that
@@ -650,7 +501,7 @@ int Lattice::vacancyCheck(int n, const Particle& oldPos){
 }
 
 
-inline double Lattice::computeWaitingTime(void){
+double Lattice::computeWaitingTime(void){
   //compute waiting time:
 
   //one time step
@@ -701,6 +552,15 @@ void Lattice::move(){
       dz_[i] = pos_[0].z - pos_0_.z + windingNumber_0_z * latticeZ_;
 
       dr_[i] = sqrt( pow(dx_[i],2) + pow(dy_[i],2) + pow(dz_[i],2) );
+
+
+      //TEST: KAOS / CHAOS-project: if I want to store coordinates
+      //rather than displacement. good for seeing brownian walk.
+      //dx_[i] = pos_[0].x;
+      //dy_[i] = pos_[0].y;
+      //dz_[i] = pos_[0].z;
+      //dr_[i] = sqrt( pow(dx_[i],2) + pow(dy_[i],2) + pow(dz_[i],2) );
+
 
       i++;
     }
@@ -1321,55 +1181,4 @@ void Lattice::countNeighbours(Particle particle, vector<int>& Count){
   }
 }
 
-
-
-
-
-
-
-// ----------------------------------
-// NOT COMPLETE YET. WORK IN PROGRESS
-// ----------------------------------
-
-
-void Lattice::snapshot(void){
-  //NOTE! This is only for 2D, with isotropic jumprate, and the same
-  //system side-length! Its purpose is to print a snapshot of the
-  //system, to see the spatial distribution of different particles
-  //as a heat map. Only used this function briefly.
-
-  vector< vector<double> > matris;
-
-  vector<double> temp;
-  temp.assign(latticeY_,0);
-  matris.assign(latticeX_,temp);
-
-  for(int i=0; i < noParticles_; i++){
-    matris[ pos_[i].x-1 ][ pos_[i].y-1 ] = jumpRate_[i].x.r; //TODO BUG!
-  }
-
-  ofstream heat;
-  char NameOfFiles[]="heatmap.dat";
-  heat.open(NameOfFiles);
-
-  //true: plotar endast partiklarna, false: plottar aven tomma rutor (=0)
-  bool points=true;
-
-  if(points){
-    //This does not give 0 where there are no particles:
-    for (int i=0; i < noParticles_; i++)
-      heat  << pos_[i].x<<" \t"<< pos_[i].y <<"\t"<< jumpRate_[i].x.r<< endl; //TODO BUG
-  }
-  else{
-    //This gives zeroes for all empty sites:
-    for(int i=0; i<latticeX_; i++){
-      for(int j=0; j<latticeY_; j++){
-        heat << i <<"\t"<< j <<"\t"<< matris[i][j]<<endl;
-      }
-    }
-  }
-
-  heat.close();
-  cout<<"Pinted Heatmap"<<endl;
-}
 

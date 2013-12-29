@@ -3,7 +3,6 @@
 #include <cmath>           //gives sqrt, pow, fabs,
 #include <vector>          //STL vector
 #include <string>          //STL string
-#include <cstring>         //needed for the strcat -function
 #include <algorithm>       //for min/max element finding in histogram
 
 #include "nr/nr3.h"

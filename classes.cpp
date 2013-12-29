@@ -6,16 +6,44 @@
 #include "classes.h"
 
 
+Direction::Direction(double right, double left){
+    r = right;
+    l = left;
+}
+
+Direction::Direction(const Direction &dir) : r(dir.r), l(dir.l) {
+}
+
+Direction::Direction(void) : r(0.0), l(0.0) {
+}
+
+
+
 Particle::Particle(int X, int Y, int Z){
   x = X;
   y = Y;
   z = Z;
+  
+  //Rate automagically initiated to zero by the constructor of
+  //Jump (which calls constructor of Direction which sets it to zero).
 
 }
 
-Direction::Direction(double right, double left){
-    r = right;
-    l = left;
+Particle::Particle(const Particle & p) : x(p.x), y(p.y), z(p.z), rate(p.rate) {
+}
+
+Particle::Particle(void) : x(0), y(0), z(0) {
+}
+
+
+Particle & Particle::operator=(const Particle & input){
+  x = input.x;        //coordinates
+  y = input.y;
+  z = input.z;
+
+  rate = input.rate;  //jump rate
+
+  return *this;
 }
 
 
@@ -35,6 +63,13 @@ std::istream& operator<< (std::istream &in, Particle &particle){
   in >> particle.z;
   return in;
 }
+
+
+
+
+
+
+
 
 
 

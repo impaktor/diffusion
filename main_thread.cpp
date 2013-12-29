@@ -4,36 +4,40 @@
 #include <string>
 #include <vector>
 
+#include <sstream>     //for [o]stringstream
+
 //Random number generator from numerical recipes 3 ed, but
 //modified not to depend on nr.h since that breaks boost::thread
-//#include "nr/ran_mod.h"
+#include "nr/ran_mod.h"
 
 #include "auxiliary.h" //non-physics stuff. (print messages etc.)
 #include "classes.h"   //various data structures /classes (Jump, Particle)
 #include "lattice.h"   //this is the main class, that does the physics.
 #include "save.h"      //class to save MSD, compute errors, and print to file
 
-#include <sstream>     //XXX temp (multiple output-files)
 
 #include <boost/thread/thread.hpp>
 
 //HARD-CODED VARIABLES:
-#define DISTRIBUTION     3          //0 = uniform, 1 = exponential,
-//                                    2 = power-law, 3 = nakazato
-#define JUMPRATE_TRACER  1          //default value
-#define JUMPRATE_CROWDER 0.5        //(if nakazato-distribution)
-#define FIXBOUNDARY      1          //1=fix wall, 0=periodic boundary
-#define EXPONENTAIL_WAITING_TIME 1
 
-const double SEED_JUMP     = 17;    //usually: 17
+const int DISTRIBUTION  = 3;           //0 = uniform, 1 = exponential,
+//                                      2 = power-law, 3 = nakazato
+const float JUMPRATE_TRACER = 1;       //default value
+const float JUMPRATE_CROWDER = 0.5;    //(if nakazato-distribution)
+const bool FIXBOUNDARY =      0;       //1=fix wall, 0=periodic boundary
+const bool EXPONENTAIL_WAITING_TIME = 1;
 
-const double SEED_LATTICE1 = 15;    //usually: 15,87,64,32
+const double SEED_JUMP     = 17;       //usually: 17
+
+const double SEED_LATTICE1 = 15;       //usually: 15,87,64,32
 const double SEED_LATTICE2 = 87;
 const double SEED_LATTICE3 = 64;
 const double SEED_LATTICE4 = 32;
 
+
 void computeJumpRates(vector<Jump>&, float&, const int,
                       const float, const float);
+
 
 int main(int argc, char* argv[]){
   int N;                            //Number of particles
@@ -45,28 +49,34 @@ int main(int argc, char* argv[]){
   //All these default values can be changed by passing argument flags
   //at the command line when executing the binary file. This is done
   //by the function argumentFlags() below.
-  bool fixBoundaryOn = FIXBOUNDARY; //boundary condition, false = periodic
-  bool logscale = false;            //spacing between sampling times log/lin
-  bool useLowMem = false;           //don't save memory
-  bool quiet = false;               //print simulation progress to screen
-  string nameOfOutFile = "out.dat"; //default output name
-  int noOutFiles = 1;               //only run one simulation (1 output file)
-  int interactStr = 0;              //interaction strenth
-  bool interactOn = false;          //don't use the interaction algorithm
-  bool jackknife = false;           //if true: use jackknife, take lots of time
-  char method;                      //use bootstrap ('b') or Brute force ('B')
+  bool fixBoundaryOn = FIXBOUNDARY;  //boundary condition, false = periodic
+  bool logscale = false;             //spacing between sampling times log/lin
+  bool useLowMem = false;            //don't save memory
+  bool quiet = false;                //print simulation progress to screen
+  string nameOfOutFile = "out.dat";  //default output name
+  string nameOfInFile;               //use input file
+  int noOutFiles = 1;                //only run one simulation (1 output file)
+  int interactStr = 0;               //interaction strength
+  bool interactOn = false;           //don't use the interaction algorithm
+  bool jackknife = false;            //if true: use jackknife, take lots of time
+  char method;                       //use bootstrap ('b') or Brute force ('B')
   float jumpTracer = JUMPRATE_TRACER; //k_t
 
   //change default values depending on arg. flags given on cmdline.
-  argumentFlags(argc,argv,logscale,useLowMem,interactOn,quiet,interactStr,
-                nameOfOutFile, noOutFiles, method,jackknife, jumpTracer);
+  argumentFlags(argc,argv,logscale,useLowMem,interactOn,quiet,
+                interactStr, nameOfOutFile, nameOfInFile, noOutFiles,
+                method,jackknife, jumpTracer);
 
   if (fixBoundaryOn)
     cout << "# Fix boundary" << endl;
   else
     cout << "# Periodic boundary" << endl;
 
-  AskUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
+  //get the simultion parameters:
+  if (nameOfInFile.empty())
+    askUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
+  else
+    readInputFile(nameOfInFile,X,Y,Z,N,ensemble,antalPunkter,maxTime);
 
   //Initiate the Lattice class, which is what does all the physics.
   Lattice crowd1(X,Y,Z,N,SEED_LATTICE1,fixBoundaryOn);
@@ -134,7 +144,7 @@ int main(int argc, char* argv[]){
     float jumpCrowders = JUMPRATE_CROWDER;  //k_c (only if Nakazato)
     vector<Jump> jumpRates;                  //returned by reference
 
-    //store characteristic trait of cosen distribution
+    //store characteristic trait of chosen distribution
     float info;
 
     //generate jumprates for all crowding particles.
@@ -153,7 +163,7 @@ int main(int argc, char* argv[]){
 
 
     //====================
-    //When I use the inteeraction code, make sure I have Nakazato distribution
+    //When I use the interaction code, make sure I have Nakazato distribution
     //with identical jumprates!
     if ((interactOn && DISTRIBUTION != 3) ||
         (JUMPRATE_CROWDER != JUMPRATE_TRACER
@@ -175,10 +185,14 @@ int main(int argc, char* argv[]){
 
       if (!quiet)  printToScreen.printProgress(E);
 
-      // crowd1.place();
-      // crowd1.move();
-      // ++E;
+      //When not using threads:
+      //-------------------
+      crowd1.place();
+      crowd1.move();
+      //++E;
 
+      //When using threads:
+      //-------------------
       boost::thread thrd1(&Lattice::generateTrajectory, &crowd1,boost::ref(E));
       boost::thread thrd2(&Lattice::generateTrajectory, &crowd2,boost::ref(E));
       boost::thread thrd3(&Lattice::generateTrajectory, &crowd3,boost::ref(E));
@@ -189,24 +203,7 @@ int main(int argc, char* argv[]){
       thrd3.join();
       thrd4.join();
 
-      //make a print out of individual ensemble:
-      //crowd.dumpSimulation(E);
-
-      // //TEST: to get a snapshot close to the MaxTime
-      // if(totalTime >= MaxTime-0.01){
-      //   crowd.Snapshot();
-      //   cout << "totalTime:" << totalTime << endl;
-      // }
-
-
-      // TODO: ej uppdaterad efter min move()-implementering!
-      //  if(InteractOn){//INTERACTION
-      //     This is just to save the information of cluster-size distribution
-      //     crowd.saveCluster(totalTime);
-      // }//BUG Augusti, gar otroligt trogt med denna!
-
-
-      //Store tracer position at each point for this ensemble, needed by
+      //Store tracer position at each point for this "ensemble", needed by
       //class to compute standard error/deviation. (+for binning, etc.)
       //extract displacement coordinates of the tracer...
       //store the current ensemble values in these:
@@ -214,8 +211,6 @@ int main(int argc, char* argv[]){
       vector<double> dr;
 
       crowd1.getDisplacement(dx,dy,dz,dr);
-
-      //... and insert in our save-function:
       save.store(dx,dy,dz,dr);
 
       crowd2.getDisplacement(dx,dy,dz,dr);
@@ -227,12 +222,6 @@ int main(int argc, char* argv[]){
       crowd4.getDisplacement(dx,dy,dz,dr);
       save.store(dx,dy,dz,dr);
     }
-
-    if(interactOn){//INTERACTION
-      //print a histogram of clusters
-      //crowd.saveBinning(ensemble);
-    }//Bug-Warning very slow! (august 2010)
-
 
     //To print which distribution we used to head of output-file
     string dist[]     = {"uniform","exponential","powerlaw","nakazato"};
@@ -259,12 +248,12 @@ int main(int argc, char* argv[]){
 
     string head = print.str();
 
-    //calculate standard deviation, errorbars, and save to file
+    //calculate standard deviation, error-bars, and save to file
     save.save(nameOfOutFile, head);
 
     if(method == 'b' && !useLowMem){
       //bootstrap the shit out of this. Note, the bootstrapped
-      //output files can be destingushed from the "real" simulation
+      //output files can be distinguished from the "real" simulation
       //by them ending with a number i: {0 < i < (noOutFiles - 1)}
 
       save.setJumprate(jumpRates[0].x.r);
@@ -288,51 +277,6 @@ int main(int argc, char* argv[]){
 
 
 
-/*
-  LEFT TO DO:
-  ----------
-  -remove various testing-loops
-  -plot directly with gnuplot.
-  -remove the set_interaction --> constructor! (doesn't work)
-  -rename all variables using camelCase
-  -kanske ha en MSD-klass, double x y z r?
-  -kompilera med -Wall -pedantic
-  -use __LINE__ to print line-number where error occured
-  -use exceptions perhaps?
-  -compare NRvector vs std::vector, for speed?
-*/
-
-//There are various testing functions in here, but they are either silenced by
-//use of if-statements in combination with a boolean "test" variable set to
-//false, or just commented out. A lot of work went into testing the output,
-//therefore some things can seem redundant, such as printing un-squared
-//displacements (<dx>~0) etc.
-
-/*
-
-  OUTLINE OF THE FUNCTION CALLS OF THIS PROGRAM:
-  ---------------------------------------------
-
- With                      Without
- Interaction:              Interaction:
- -----------               ------------
- main()                     main()
-  |                          |
- move()                     move()
-  |                          |
- moveAndBoundaryCheck()     moveAndBoundaryCheck()
-  |                          |
- vacancyCheck()             vacancyCheck()
-  |                          |
- Interaction()               |
-  |                          |
- CountNeighbors()            |
-  |                          |
-  |                          |
- [make the actual move]     [make the actual move]
-
-*/
-
 
 void computeJumpRates(vector<Jump>& hopRate, float& info, const int N,
                       const float jumpTracer, const float jumpCrowders){
@@ -340,7 +284,7 @@ void computeJumpRates(vector<Jump>& hopRate, float& info, const int N,
   //we store by hopRate.push_back() further down
   hopRate.clear();
 
-  static Ran randomHopDistribution(SEED_JUMP);   //just anny seed will do
+  static Ran randomHopDistribution(SEED_JUMP);   //just any seed will do
 
   //Characteristic trait of the chosen distribution,
   //just used to print info to file/screen
@@ -386,7 +330,7 @@ void computeJumpRates(vector<Jump>& hopRate, float& info, const int N,
     }
     else{
       if (n > 3 || n <0 )
-        cout << "Invalid value/choise for prob.distribution ("<< n <<")"
+        cout << "Invalid value/choice for prob.distribution ("<< n <<")"
              << endl;
       else
         printError("Random number for jumprate must be 0 < r < 1");
