@@ -36,17 +36,17 @@ The code follows the following rules:
 |DESCRIPTION              | EXAMPLE                    |
 |                         |                            | 
 |-------------------------|----------------------------| 
-|Variables:               | camelCase, myVariable      | 
+|All variables:           | camelCase, myVariable      | 
 |-------------------------|----------------------------| 
 |Constants:               | MY_CONSTANT                | 
 |-------------------------|----------------------------| 
-|Private class variables: | variable_                  | 
+|Private class variables: | camelCase_                 | 
 |-------------------------|----------------------------| 
 |Types:                   | CamelCase, MyType, Particle| 
-|(always a noun)          |                            | 
+|(always a noun)          | Direction, etc.            | 
 |-------------------------|----------------------------| 
 |Functions & methods:     | myFunction(), getVariable()| 
-|(always a verb)          |                            | 
+|(always a verb)          | setVariable(), computeD()  | 
 '______________________________________________________'
 
 -"Generic variables should have the same name as their type"

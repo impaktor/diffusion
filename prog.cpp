@@ -7,8 +7,10 @@
 #include <string>
 #include <vector>
 
-#include "nr3.h"           //Random number generator from numerical recipes 3 ed.
-#include "ran.h"  
+#include "nr3.h"           //ran.h and ludcmp.h depends on this one. 
+#include "ran.h"           //Random number generator from numerical recipes 3 ed.  
+#include "ludcmp.h"        //only depends on nr3.h, used in computePearson 
+
 
 #include "auxilary.h"      //non-physics stuff. (print messages etc.)
 #include "classes.h"       //my own classes (Jump, Particle)
@@ -20,21 +22,27 @@
 //      $ ssh -n 'cd /to/path; nice -19 ./program <input.dat'
 // Or:  $ ssh -X nice -19 ./program output.dat < input.dat'
 
-//HARDCODED VARIABLES:                                             SETS THEM IN:
-#define DISTRIBUTION     0    //0=uniform, 1=exponential,         | (main)
-//                              2=power-law, 3=nakazato           | (main)
-#define JUMPRATE_TRACER  0.01//                                   | (main)
+//HARD-CODED VARIABLES:                                           SETS THEM IN:
+#define DISTRIBUTION     0    //0 = uniform, 1 = exponential,     | (main)
+//                              2 = power-law, 3 = nakazato       | (main)
+#define JUMPRATE_TRACER  0.5  //                                  | (main)
 #define JUMPRATE_CROWDER 0.5  //(if nakazato-distribution)        | (main)
 #define FIXBOUNDARY      1    //1=fix wall, 0=periodic boundary   | (main ->class)
 #define TEST_1           0    //boolean, prints details to screen | (constructor)
-#define LOWMEM           0    //0=false / 1=true                  | ()
-#define EXPONENTAIL_WAITING_TIME 0 //                             | (Move2())
+#define EXPONENTAIL_WAITING_TIME 0 //                             | (computeWaitingTime())
+
+/*
+Testar nu den nya v.6 med samplingTime istallet!
+-LowMem on/off   Identical. 1% minne vid On, 50 % vid off!
 
 
+*/
+
+//-----------------------------------------------------------
 //now test my InteractionRoutine, with LowMem. (and without!):
-// at -i 2, c=0.7 k_t=0.25, LowMem=ON  Identical!
-// at -i 3, c=0.4 k_t=0.25, LowMem=OFF Identical!
-// at -i 2, c=0.5 k_t=0.25, LowMem=ON  Identical!
+// at -i 2, c=0.7 k_t=0.25, LowMem = ON  Identical!
+// at -i 3, c=0.4 k_t=0.25, LowMem = OFF Identical!
+// at -i 2, c=0.5 k_t=0.25, LowMem = ON  Identical!
 
 //now test LowMem ON (and this new merged code) for interactions off
 // at k_t=0.5 c=0.5,         2Duniform,  Identical!
@@ -51,9 +59,11 @@ class Partiklar {
   vector<long double> x2_err,y2_err,z2_err,r2_err; //Store std error, in each point
   vector<double> x2_mu,y2_mu,z2_mu,r2_mu;  //average of displacement squared: <X^2>,... 
   vector<double> x_mu, y_mu, z_mu, r_mu;   //average of displacement: <X>, <Y>...
-  vector<double> t;                        //store the time to be matched to the stored pos.
+  vector<double> samplingTime_;            //times to compute the MSD.
+  int maxElement_;                         //number of times to sample
+  vector<double> pearsonCorrelation_;       //The correlation between two neighboring sample points.  
 
-  vector<Jump> jumpRate_;                   //jump-rate for each particle and direction
+  vector<Jump> jumpRate_;                  //jump-rate for each particle and direction
   vector <long double> partialSum_;        //cumulative sum of jump-rates
 
   int dim_;                                //dimension of lattice (=1 || 2 || 3)
@@ -62,9 +72,13 @@ class Partiklar {
   double timeSum_;                         //Sum of time for each move
 
   //TODO------------
-  //vector< vector<Particle> > msdTracer;    //pos. of tracer particle. needed for stdrerr
-  vector< vector<int> > dx,dy,dz;            //pos. of tracer particle. needed for stdrerr
-  vector< vector<double> > dr;               //pos. of tracer particle. needed for stdrerr
+  vector<int> dx,dy,dz;                    //pos. of tracer particle for current ensemble 
+  vector<double> dr;                       //pos. of tracer particle for current ensemble 
+  
+  vector< vector<int> > store_dx;          //save dx for each ensemble to compute stdErr 
+  vector< vector<int> > store_dy;
+  vector< vector<int> > store_dz;
+  vector< vector<double> > store_dr;
   //------------
 
   int convertMuToParticle(int, int&);
@@ -76,9 +90,9 @@ class Partiklar {
   vector<vector<vector<int> > > vacancy_; //Needed in my more efficient "vacancyCheck()"
 
 
-  void stdErr(int);                        //calculate standard deviation
-  void stdErrLowMem(int);                  //a more memmory conservative version of the above
-  bool LowMem_;                             //Switch between the two stdErr-functions above. 
+  void computeStdErr(int);                //calculate standard deviation
+  void computeStdErrLowMem(int);          //a more memmory conservative version of the above
+  bool lowMem_;                           //Switch between the two stdErr-functions above. 
   vector<double> dr4_err,dx4_err,dy4_err,dz4_err; //needed if we use stdErrLowMem()
 
   float jumpCrowders_, jumpTracer_;        //only used in the Nakazato()-function
@@ -97,46 +111,218 @@ class Partiklar {
   int round(float x) {                     //Round off (used to get center of lattice)
     return int(x + 0.5);  }
 
+  double computeWaitingTime(void);
+  int computePearsonCoeff(int);           //correlation between two sampling points
+
   //INTERACTION CODE ***
   void interaction(int, Particle);
   void countNeighbours(Particle, vector<int>&);
-  vector<float> clusterDistribution, clusterSize;  //For our save_cluster()-function
+  vector<float> clusterDistribution_, clusterSize_;  //For our save_cluster()-function
   void buildCluster2(int, vector<int>&, double);     //needed for save_cluster()-func.
   void checkVacancyMatrix(float);                    //Just a test-function
+
 
 public:
   Partiklar(int, int, int, int, bool);
   void place(void);                        //Place particles on the lattice
   void moveOld(void);                      //old obsolete move-code (no jump-rates)
-  void move(void);                        //pick a particle & direction based on jump-rate
-  void store(vector<int>&, vector<int>&, vector<int>&, vector<double>&);
+  void move(void);                         //pick a particle & direction based on jump-rate
+  void store(void);                        //Tell to store result
   void save(int, char[]);                  //Print simulation-run to file   
-  void set_dt(void);                       //needed to initiate time-vector
-  double get_dR(void);
-  double get_time(void);
-  int get_dX(void);
-  int get_dY(void);
-  int get_dZ(void);
   int getDimension(void);
-  void set_jumpNaka(float, float);
-  void set_dist(int, double);
-  void set_interaction(float);             //determine if we use the interaction-algorithm
-  void set_LowMem(bool, int);              //Set the switch true/false for use of low-mem run
+  void setSamplingTimes(vector<double>&);
+  void setInteraction(float);             //determine if we use the interaction-algorithm
+  void setLowMem(bool);                   //Set the switch true/false for use of low-mem run
+  void setJumpNaka(float, float);
+  void setDist(int, double);
 
   //Set jump-rate of each particle and direction 
-  void setJumpRate(vector<Jump>);
+  void setJumpRate(vector<Jump>&);
 
   //Secondary not used functions
   void snapshot(void);                     //Not used. (more comments in function body)
   //  double get_dt(void);   //Size of time-step, need it for P(x,t), don't need this...
 
-
   //INTERACTION CODE:
-  void saveBinning(int);                     //To get P(x,t)
-  void saveCluster(double);                  //To get rho(m) (cluster distribution)
-  void printCluster(void);                   //Print  rho(m) (cluster distribution)
+  void saveBinning(int);                   //To get P(x,t)
+  void saveCluster(double);                //To get rho(m) (cluster distribution)
+  void printCluster(void);                 //Print  rho(m) (cluster distribution)
+
+  //TEST-Code
+  void dumpSimulation(int);                //dump displacement for individual run to file. 
 
 };
+
+
+
+int Partiklar::computePearsonCoeff(int ensembles){
+  //This function calculates the pearson coefficients (see Numerical
+  //recipies ch 14), to get the correlation between two sampling points
+  //since if the tagged particle jumps once/sec sampling the system 
+  //10/s will not yeald any new informating, and it will mess up the 
+  //error estimation that assumes the sampling points are uncorrelated 
+  //and with a gaussian distribution.
+
+  //perhaps check: Physical Review D vol 34, 2469 (1986), sec. D  
+  
+  if(lowMem_)
+    printError("Can not compute Pearson's R, no available data.");
+
+  if(r2_mu.empty())
+    printError("Must compute MSD first! (ie. r2_mu)");
+
+  pearsonCorrelation_.assign(maxElement_,0);
+
+  //return 0;  //switch if I want to exit before we generate the matrix.
+  
+  if(false){
+    //compute the correlation between two points, i, j, for i = j+1
+    vector<double> h;
+    h.assign(maxElement_,0);
+
+    for(int i = 1; i < maxElement_; i++){
+      for(int j = 0; j < ensembles; j++){
+        h[i] += 1.0 / (ensembles-1) *
+          (pow(store_dr[j][i],2) - r2_mu[i])*
+          (pow(store_dr[j][i-1],2) - r2_mu[i-1]);
+      }
+    }
+  
+    // pearsonCorrelation[i] = h_ij / (sigma_i*sigma_j)
+    // sigma_r = r2_err * sqrt(ensembles);
+    for(int i = 1; i < maxElement_; i++){
+      if(r2_err[i-1] != 0)
+        pearsonCorrelation_[i] = h[i] / (r2_err[i]*r2_err[i-1] * ensembles);
+    
+      //NOTE: error in first value is 0, so the correlation between value 0 & 1
+      //will be inf (nan)! thus the if-statement
+    
+    }
+  }
+  else{
+    //compute entire matrix, to check the correlation between every value
+
+    if(samplingTime_[0] == 0)
+      cout << "NOTE: If the first sampling-point t_0 = 0 then the \n"
+           << "H-matrix will be singluar (first row and column =0)"
+           << endl;
+
+    NRmatrix<double> H(maxElement_, maxElement_, 0.0);
+    
+    for(int i = 0; i < maxElement_; i++){
+      for(int j = 0; j < maxElement_; j++){
+        for(int m = 0; m < ensembles; m++){
+          H[i][j] += 1.0 / (ensembles*(ensembles-1)) *
+            ( pow(store_dr[m][i],2) - r2_mu[i] ) *
+            ( pow(store_dr[m][j],2) - r2_mu[j] ) / 
+            ( (r2_err[i]*r2_err[j] * ensembles) );  
+          //TODO: Not 100% this is correct, but should give the right order of magnitude.
+        }
+      }
+    }
+    
+
+    //TEST, print matrix to file:
+    ofstream dump;
+    dump.open("Dump_H-Matrix.dat");
+    for (int i = 0; i < maxElement_; i++){
+      
+      for (int j = 0; j < maxElement_; j++)
+        dump  <<H[i][j] << "\t";
+
+      dump << endl << endl;
+    }
+    dump.close();
+
+
+    NRvector<double> b(maxElement_),z(maxElement_);
+    
+    for(unsigned int i = 0; i < maxElement_; i++)
+      b[i] = samplingTime_[i];
+
+    LUdcmp LUdecomposition(H);
+    LUdecomposition.solve(b,z);
+    
+    //copy z to the class-private vector, that we will print as the 
+    //fourth column in the output-file.
+    for(int i = 0; i < maxElement_; i++)
+      pearsonCorrelation_[i] = z[i];
+    
+  }//end-else
+  
+  return 0;
+
+}
+
+
+void Partiklar::dumpSimulation(int index){
+  //This is a test method to simply "dump" the trajectories
+  //for a single run to file. It is used to check correlaitons
+  //between different runs. 
+  
+  ofstream dump;
+  dump.open("dump.dat");
+  
+  for (int i = 0; i < maxElement_; i++){
+    dump  << samplingTime_[i] << "\t" << dr[i] << endl;
+  }
+  dump.close();
+  
+  char buffer[50];
+  sprintf(buffer,"mv dump.dat dump%d.dat",index);
+
+  cout << "Moving dump.dat to dump" << index << ".dat." << endl;
+  system(buffer);
+}
+
+
+
+void Partiklar::setSamplingTimes(vector<double>& samplingTime){
+  
+  maxElement_ = (int) samplingTime.size();
+
+  if (maxElement_ < 1)
+    printError("No sampling times set!");
+
+  //check that is is monotonously increasing:
+  bool isOrdered = false;
+  for (int i = 1; i < maxElement_; i++){
+    if (samplingTime[i-1] < samplingTime[i])
+      isOrdered = true;
+  }
+
+  if (samplingTime[0] < 0)
+    isOrdered = false;
+  
+  
+  if (isOrdered){
+    samplingTime_ = samplingTime;
+
+    //assign the displacement container.
+    dx.assign(maxElement_,0);
+    dy.assign(maxElement_,0);
+    dz.assign(maxElement_,0);
+    dr.assign(maxElement_,0);
+ 
+    //initiate the vectors for the summation in store()
+    //only needed if we use the memmory-conserving algorithm
+    if(lowMem_){
+      dr4_err.assign(maxElement_,0);
+      dx4_err.assign(maxElement_,0);
+      dy4_err.assign(maxElement_,0);
+      dz4_err.assign(maxElement_,0);
+      
+      r2_mu.assign(maxElement_,0);
+      x2_mu.assign(maxElement_,0);
+      y2_mu.assign(maxElement_,0);
+      z2_mu.assign(maxElement_,0);
+    }
+    
+  }
+  else
+    printError("Sampling times is not ordered.");
+}
+
 
 
 void Partiklar::saveCluster(double Time){
@@ -165,7 +351,7 @@ void Partiklar::saveCluster(double Time){
     //checkVacancyMatrix(10.3); //OK hit
     int M = Cluster.size();
     //First element is # of 1-clusters (ie. single particles), etc.
-    clusterDistribution[M-1] = clusterDistribution[M-1] + 1.0/nParticles_;
+    clusterDistribution_[M-1] = clusterDistribution_[M-1] + 1.0/nParticles_;
     // CheckVacancyMatrix(10.4);  //BUG! men inte OK hit!???? 
 
   }
@@ -185,14 +371,14 @@ void Partiklar::printCluster(void){
 
   //  CheckVacancyMatrix(9);
 
-  if (clusterSize.size() != clusterDistribution.size())
+  if (clusterSize_.size() != clusterDistribution_.size())
     printError("gaaa");
 
   ofstream clust;
   char NameOfFiles[]="cluster.dat";
   clust.open(NameOfFiles);
-  for(unsigned int j=0; j < clusterDistribution.size(); j++){
-    clust << clusterSize[j] <<"\t"<< clusterDistribution[j]<<endl;
+  for(unsigned int j=0; j < clusterDistribution_.size(); j++){
+    clust << clusterSize_[j] <<"\t"<< clusterDistribution_[j]<<endl;
   }
   clust.close();
   cout<<"Pinted "<<NameOfFiles<<endl;
@@ -202,7 +388,7 @@ void Partiklar::printCluster(void){
 void Partiklar::saveBinning(int Ensemble){
   //This function is for getting P(t,x), ie. the probability
   //distribution of finding a particle at x, at time t.
-  if(!LowMem_){
+  if(!lowMem_){
     int No_bins = 300;  //number of bins
     vector<vector<float> > PrintToFile; 
   
@@ -239,18 +425,18 @@ void Partiklar::saveBinning(int Ensemble){
     double PI =3.14159265;
     double R;
     cout <<"Calculating P(t,x)... ";
-    for(unsigned int k = 0; k < t.size() ; k++ ){ // OBS "k" is time! (element pos is time)
+    for(int k = 0; k < maxElement_; k++ ){ // OBS "k" is time! (element pos is time)
       // dx[0].size = t.size() 
       for (int j=0; j < No_bins ; j++){
         for(int e = 0; e < Ensemble; e++){
           //dr=dx[e][k];
-          R = sqrt(pow(dx[e][k],2) + pow(dy[e][k],2) + pow(dz[e][k],2));
+          R = sqrt(pow(store_dx[e][k],2) + pow(store_dy[e][k],2) + pow(store_dz[e][k],2));
           //R = dx[e][k] + dy[e][k] + dz[e][k];
           if(Xaxis[j+1] > R && R >= Xaxis[j]){
             Yaxis[j] = Yaxis[j] + 1.0/(Ensemble*2*PI*((R+bin_step)/2));
           }
         }
-      }
+      } 
       PrintToFile.push_back(Yaxis);
       Yaxis.clear();
       Yaxis.assign(No_bins,0);
@@ -262,9 +448,9 @@ void Partiklar::saveBinning(int Ensemble){
     char NameOfFiles[]="histogram.dat";
     hist.open(NameOfFiles);
     cout<<" ...Printing... "<<endl;  
-    for(unsigned int i=0; i <t.size(); i++){
+    for(int i = 0; i < maxElement_; i++){
       for(int j=0; j < No_bins; j++){
-        hist << Xaxis[j] + bin_step/2 <<"\t"<< t[i] <<"\t"<< PrintToFile[i][j]<<endl;
+        hist << Xaxis[j] + bin_step/2 <<"\t"<< samplingTime_[i] <<"\t"<< PrintToFile[i][j]<<endl;
       }
       hist <<endl; //separate data block with new (empty) line
     }
@@ -273,7 +459,7 @@ void Partiklar::saveBinning(int Ensemble){
   
   }
   else
-    cout<<"LowMem=ON, therefore no information stored!"
+    cout<<"lowMem=ON, therefore no information stored!"
         <<endl<<"can't print cluster-information"<<endl;
 }
 
@@ -466,78 +652,28 @@ void Partiklar::snapshot(void){
   cout<<"Pinted Heatmap"<<endl;
 }
 
-void Partiklar::set_dt(void){
-  //This will store the first time value:
-  if ( t.empty() ){
-    t.push_back(timeSum_);
-  }
-  //this will store the remaining values of the first enasmble
-  else{
-    if ( t.back() < timeSum_ ){
-      t.push_back(timeSum_);
-      // cout <<"tidsfunktionen: "<<t.back()<< " timeSum_: "<<timeSum_<<endl;
-    }
-  }
-} //NOTE funkar inte om det är olika jumprates för olika ensambles
-
 int Partiklar::getDimension(void){ //could be useful to have, but not neccesary...
   return dim_;
 }
 
-int Partiklar::get_dX(void){
-  //current position minus starting position.
-  return pos[0].x-pos_0.x;
-}
-
-int Partiklar::get_dY(void){
-  return pos[0].y-pos_0.y;
-}
-
-int Partiklar::get_dZ(void){
-  return pos[0].z-pos_0.z;
-}
-
-double Partiklar::get_dR(void){
-  double r =sqrt( pow(pos[0].x-pos_0.x,2) + pow(pos[0].y-pos_0.y,2) + pow(pos[0].z-pos_0.z,2) ); 
-  return r;
-}
-
-double Partiklar::get_time(void){
-  return timeSum_;
-}
-
-void Partiklar::set_jumpNaka(float jumpCrowders, float jumpTracer){
+void Partiklar::setJumpNaka(float jumpCrowders, float jumpTracer){
   jumpCrowders_ = jumpCrowders;
   jumpTracer_ = jumpTracer;
 }
 
-void Partiklar::set_dist(int distribution, double info){
+void Partiklar::setDist(int distribution, double info){
   distribution_ = distribution;
   info_ = info;
 }
 
-void Partiklar::set_interaction(float interactionStrength){
+void Partiklar::setInteraction(float interactionStrength){
   interactionStrength_ = interactionStrength; 
   interactionOn_ = true; 
 }
 
-void Partiklar::set_LowMem(bool LowMem, int NumberOfPoints){
+void Partiklar::setLowMem(bool lowMem){
   //Set the switch true/false for use of low-mem run
-  LowMem_ = LowMem;
-
-  //initiate the vectors for the summation in store()
-  if(LowMem){
-    dr4_err.assign(NumberOfPoints,0);
-    dx4_err.assign(NumberOfPoints,0);
-    dy4_err.assign(NumberOfPoints,0);
-    dz4_err.assign(NumberOfPoints,0);
-    
-    r2_mu.assign(NumberOfPoints,0);
-    x2_mu.assign(NumberOfPoints,0);
-    y2_mu.assign(NumberOfPoints,0);
-    z2_mu.assign(NumberOfPoints,0);
-  }
-
+  lowMem_ = lowMem;
 }
 
 
@@ -595,12 +731,12 @@ Partiklar::Partiklar(int xSquare,int ySquare,int zSquare,
       pos_0.z = round(1.0*latticeZ_/2); 
       
       //TODO: what if Z = 0
-      concentration_=(float) nParticles_ / (latticeX_ * latticeY_ * latticeZ_); 
+      concentration_ = (float) nParticles_ / (latticeX_ * latticeY_ * latticeZ_); 
 
       //Hardcoded Switches:
       //------------------
       //boolean, for print details to screen. 
-      testOnOff_=TEST_1;
+      testOnOff_ = TEST_1;
 
       //Define the dimention of the lattice
       if (latticeY_<=1 && latticeZ_<=1) dim_ = 1; 
@@ -613,17 +749,17 @@ Partiklar::Partiklar(int xSquare,int ySquare,int zSquare,
 
       //By default: don't use the memmory conserving stdErrLowMem()
       //use the set_LowMem()-function in the main()-func to change this
-      LowMem_ = false;      
+      lowMem_ = false;      
 
       //--------------------------
       //To get the Cluster Distribution (see saveCluster()):
-      // Cluster_Distribution = number of clusters with "m" particles
-      // Cluster_Size = number of particles in cluster (just our x-axis)
+      // Cluster_Distribution_ = number of clusters with "m" particles
+      // Cluster_Size_ = number of particles in cluster (just our x-axis)
       int Maximus_Clustirus = nParticles_; 
       //Maximal cluster size to include in distribution
-      clusterDistribution.assign(Maximus_Clustirus,0); //assign zeros...
+      clusterDistribution_.assign(Maximus_Clustirus,0); //assign zeros...
       for (int i=1; i <= Maximus_Clustirus ; i++){
-        clusterSize.push_back(i);
+        clusterSize_.push_back(i);
       }//--------------------------
  
 
@@ -957,92 +1093,145 @@ int Partiklar::vacancyCheck(int n, Particle oldPos){
 }
 
 
+inline double Partiklar::computeWaitingTime(void){
+  //compute waiting time:
 
-void Partiklar::move(){
-  
-  //pick a particle & direction based on jump-rate, and move.
-  if (partialSum_.empty())
-    printError("Partial-sum vector has not been initiated");
-  
-  static Ran randomNumb(8);
-  double r2;
+  double tau;
+  bool expWaitTime = EXPONENTAIL_WAITING_TIME;  
 
-  //  for (int i=0; i < N; i++){      //make N moves
-
-  int mu_guess;                       // must be integer. (index of vector)
-  int mu_left = 0;
-  int mu_right = dim_*2*nParticles_;
-  double p_left = (double) partialSum_.front();  //value in first element ( =0 )
-  double p_right = (double) partialSum_.back();  //value in last element ( =dim_*2*N)
- 
-  do{
-    r2 = randomNumb.doub();
-  }while( r2 == 1 || r2 == 0 );
-
-  double p_rand = (double) r2*partialSum_.back();
-  bool LoopAgain=true;
-
-  //NOTE: when comparing a long double against a double, C++ will fill
-  //in the blanks with zeroes. Every 10^15 run of move() will lead to
-  //a situation where we actually have p_rand==p[mu_guess], and
-  //changing the intervall below in the if statements,
-  //from "..<= .. <.." to "..< .. <=.." will result in an infinite 
-  //loop every 10^15 turns since "double" stores 52 bit, 2^52 = 10^15.
-  //This bug has now been fixed!
-
-  //finds the mu
-  do{ 
-    mu_guess = (int) ( (p_rand - p_left) * ( mu_right - mu_left )
-                       /(p_right - p_left) + mu_left );
-
-    if ((double) partialSum_[mu_guess] <= p_rand && p_rand < 
-        (double) partialSum_[mu_guess+1])
-      LoopAgain = false;
-
-    else{
-      if (p_rand < (double) partialSum_[mu_guess]){
-        mu_right = mu_guess;
-        p_right = partialSum_[mu_guess];
-      }
-      else{//if (r2*partialSum_.back() > partialSum_[mu_guess+1]){
-        mu_left = mu_guess + 1;
-        p_left = partialSum_[mu_guess+1];
-      }
-    }
-  }while(LoopAgain);
-
-  int mu = mu_guess;
-  int n,r;        
-
-  
-  //transforms the index mu to which particle to move 
-  //(index n, by reference) and in which direction,by returning 
-  //an integer 0<= r <= 5 (in 3D)
-  r = convertMuToParticle(mu,n);
-  
-  //moves the particle n in direction r, according to boundary 
-  //conditions. If new site is occupied, move back to previous pos. 
-  moveAndBoundaryCheck(n,r);
-
-  bool expWaitTime = EXPONENTAIL_WAITING_TIME;
   static Ran randomNumb2(87);
-
-  //XXXX
-  //Use linear or exponential waiting time
+  double r3;
+  
   if(expWaitTime){
-    double r3;
     do{
       r3 = randomNumb2.doub();
     }while( r3 == 1 || r3 == 0 );
     
-    timeSum_ = timeSum_ + log(1.0/r3)/partialSum_.back();
+    tau = log(1.0/r3)/partialSum_.back();
   }
-  else{
-    timeSum_ = timeSum_ + 1.0/partialSum_.back();
-  }
-
-  //} //move N times end
+  else //linear waiting time
+    tau = 1.0/partialSum_.back(); 
+  
+  return tau;
 }
+
+
+void Partiklar::move(){
+
+  double tau;      //waiting time
+  int i = 0;      //index of samplingTime-vector
+  timeSum_ = 0;
+
+  while(timeSum_ < samplingTime_[maxElement_-1]){ // "-1" since we start on 0.
+    //The time-sampling was completley rewritten in late August 2010
+    //to resolve the spagetti that was the previous version. This
+    //follows the gillespie_exclusion2.cpp-implementation closley, to
+    //make it easier on those already familiar with that source code. 
+    
+    tau = computeWaitingTime();
+
+    //Save displacement if next time-step is beyond next sampling time
+    while(timeSum_ <= samplingTime_[i] && 
+          samplingTime_[i] < timeSum_ + tau  && i < maxElement_){
+
+      //save displacement (from previous step)
+      dx[i] = pos[0].x - pos_0.x;
+      dy[i] = pos[0].y - pos_0.y;
+      dz[i] = pos[0].z - pos_0.z;
+      dr[i] = sqrt( pow(dx[i],2) + pow(dy[i],2) + pow(dz[i],2) ); 
+      
+      i++;
+    }
+
+    /*  
+    //TEST (this is similar to what my spagetti code used:)
+    if(timeSum_ <= samplingTime_[i] &&  samplingTime_[i] < timeSum_ + tau && 
+       i < maxElement_){
+
+      //save displacement (from previous step)
+      dx[i] = pos[0].x - pos_0.x;
+      dy[i] = pos[0].y - pos_0.y;
+      dz[i] = pos[0].z - pos_0.z;
+      dr[i] = sqrt( pow(dx[i],2) + pow(dy[i],2) + pow(dz[i],2) ); 
+      
+      i++;
+    }
+    */
+    
+   
+    //TODO remove! -------------------------------------------
+    //pick a particle & direction based on jump-rate, and move.
+    if (partialSum_.empty())
+      printError("Partial-sum vector has not been initiated");
+
+    static Ran randomNumb(8);
+    double r2;
+
+    int mu_guess;                       // must be integer. (index of vector)
+    int mu_left = 0;
+    int mu_right = dim_*2*nParticles_;
+    double p_left = (double) partialSum_.front();  //value in first element ( =0 )
+    double p_right = (double) partialSum_.back();  //value in last element ( =dim_*2*N)
+ 
+    do{
+      r2 = randomNumb.doub();
+    }while( r2 == 1 || r2 == 0 );
+
+    double p_rand = (double) r2*partialSum_.back();
+    bool LoopAgain=true;
+
+    //NOTE: when comparing a long double against a double, C++ will fill
+    //in the blanks with zeroes. Every 10^15 run of move() will lead to
+    //a situation where we actually have p_rand==p[mu_guess], and
+    //changing the intervall below in the if statements,
+    //from "..<= .. <.." to "..< .. <=.." will result in an infinite 
+    //loop every 10^15 turns since "double" stores 52 bit, 2^52 = 10^15.
+    //This bug has now been fixed!
+
+    //finds the mu
+    do{ 
+      mu_guess = (int) ( (p_rand - p_left) * ( mu_right - mu_left )
+                         /(p_right - p_left) + mu_left );
+
+      if ((double) partialSum_[mu_guess] <= p_rand && p_rand < 
+          (double) partialSum_[mu_guess+1])
+        LoopAgain = false;
+
+      else{
+        if (p_rand < (double) partialSum_[mu_guess]){
+          mu_right = mu_guess;
+          p_right = partialSum_[mu_guess];
+        }
+        else{//if (r2*partialSum_.back() > partialSum_[mu_guess+1]){
+          mu_left = mu_guess + 1;
+          p_left = partialSum_[mu_guess+1];
+        }
+      }
+    }while(LoopAgain);
+
+    int mu = mu_guess;
+    int n,r;        
+
+  
+    //transforms the index mu to which particle to move 
+    //(index n, by reference) and in which direction,by returning 
+    //an integer 0<= r <= 5 (in 3D)
+    r = convertMuToParticle(mu,n);
+  
+    //moves the particle n in direction r, according to boundary 
+    //conditions. If new site is occupied, move back to previous pos. 
+    moveAndBoundaryCheck(n,r);
+
+
+
+
+
+
+    timeSum_ = timeSum_ + tau;
+
+  }
+}
+
 
 void Partiklar::interaction(int n, Particle oldPos){
   vector<int> NearestNeighbours;
@@ -1166,9 +1355,8 @@ void Partiklar::countNeighbours(Particle particle, vector<int>& Count){
 
 
 
-void Partiklar::store(vector<int>& x_displace, vector<int>& y_displace,
-                      vector<int>& z_displace, vector<double>& r_displace){
-  //This is needed to calculate error bars (stdErr())
+void Partiklar::store(void){
+  //This is needed to calculate error bars in computeStdErr().
   
   /*
     Error in each point i is (in LaTeX notation):
@@ -1180,16 +1368,16 @@ void Partiklar::store(vector<int>& x_displace, vector<int>& y_displace,
     The original way to do this is save the value in each point a[i] for 
     each ensemble, but that leaves us with a giant matrix if we have many
     ensembles N, and many data points D, (N*D ~> 10^9) ~ 1Gb of mem usage
-    (10^9/2^30 ~ 1Gb). Therefore with the switch 'LowMem=true' we do the 
+    (10^9/2^30 ~ 1Gb). Therefore with the switch 'lowMem=true' we do the 
     left hand side of the equation above, and then we don't need a matrix
     but just two vectors, for each dimension. 
   */
 
-  //Check that we assigned the vectors =0 if we uses the LowMem-option.
-  //For LowMem=false, we do this in the Save & stdErr()-functions
+  //Check that we assigned the vectors =0 if we uses the lowMem-option.
+  //For lowMem=false, we do this in the Save & computeStdErr()-functions
   //since we use push_back() instead.
-  if(LowMem_){
-    bool error=false;
+  if(lowMem_){
+    bool error = false;
     if (dr4_err.size() == 0) error = true;
     if (dx4_err.size() == 0) error = true;
     if (dy4_err.size() == 0) error = true;
@@ -1202,96 +1390,108 @@ void Partiklar::store(vector<int>& x_displace, vector<int>& y_displace,
    
     if(error){
       cout<<"Incorrect assignment of vectors for stdErr-LowMem"
-          <<endl<<"Must be assigned by set_LowMem()-function!"<<endl;
+          <<endl<<"Must be assigned by setLowMem()-function!"<<endl;
       abort();
     }
   }
 
-  if(LowMem_ == false){
-    //if don't use the LowMem-algorithm:
+  if(lowMem_ == false){
+    //if don't use the lowMem-algorithm:
     //this gives dx[ensembler][number of values] 
-    dx.push_back(x_displace);   
-    dy.push_back(y_displace);
-    dz.push_back(z_displace);
-    dr.push_back(r_displace);
+    store_dx.push_back(dx);   
+    store_dy.push_back(dy);
+    store_dz.push_back(dz);
+    store_dr.push_back(dr);
+    
+    //TODO, nollas dessa efter varje store?
+    /*
+      nej, initieras i setSamplingTime(), men anvander inte push back!
+      dvs borde vara OK.
+
+     */
   }
   else{
     //To conserve memmory we do the summation directley, which might
     //cause a nummerical error in the end compared to doing it the 
-    //more rigorous way. Compare to make sure it works.
-    for(int i=0; i < r_displace.size(); i++){
-      dr4_err[i] = dr4_err[i] + pow( r_displace[i] ,4);
-      dx4_err[i] = dx4_err[i] + pow( x_displace[i] ,4);
-      dy4_err[i] = dy4_err[i] + pow( y_displace[i] ,4);
-      dz4_err[i] = dz4_err[i] + pow( z_displace[i] ,4);
+    //more rigorous way, but all tests I've made returns identical 
+    //output
+    for(int i = 0; i < maxElement_; i++){
+      dr4_err[i] = dr4_err[i] + pow( dr[i] ,4);
+      dx4_err[i] = dx4_err[i] + pow( dx[i] ,4);
+      dy4_err[i] = dy4_err[i] + pow( dy[i] ,4);
+      dz4_err[i] = dz4_err[i] + pow( dz[i] ,4);
 
-      r2_mu[i] = r2_mu[i] + pow( r_displace[i] ,2);
-      x2_mu[i] = x2_mu[i] + pow( x_displace[i] ,2);
-      y2_mu[i] = y2_mu[i] + pow( y_displace[i] ,2);
-      z2_mu[i] = z2_mu[i] + pow( z_displace[i] ,2);
+      r2_mu[i] = r2_mu[i] + pow( dr[i] ,2);
+      x2_mu[i] = x2_mu[i] + pow( dx[i] ,2);
+      y2_mu[i] = y2_mu[i] + pow( dy[i] ,2);
+      z2_mu[i] = z2_mu[i] + pow( dz[i] ,2);
     }
   }
-  
 }
 
 
+
+
+
 void Partiklar::save(int Ensemble, char name[]){
-  //Now process the simulation data, and print it to
-  //file "name".
-  
+  //calculates the MSD from the stored positions of the tracer, 
+  //and prints to file. 
+
+  //print the information to file:.
   char* Primary = name;
 
-  int numberOfValues = t.size();
-  ofstream primary,secondary;
+  ofstream primary, secondary;
   primary.open(Primary);
 
   //hardcoded switch to print x,y,z, x^2,y^2,z^2
   //specifically. Not needed now, since system is isotropic,
-  bool xyz=false;
+  bool xyz = false;
   if(xyz) secondary.open("txyz.dat");
 
-  if(!LowMem_){
+  if(!lowMem_){
     //Compute <R>:
-    x_mu.assign(numberOfValues,0);
-    y_mu.assign(numberOfValues,0);
-    z_mu.assign(numberOfValues,0);
-    r_mu.assign(numberOfValues,0);
+    x_mu.assign(maxElement_,0);
+    y_mu.assign(maxElement_,0);
+    z_mu.assign(maxElement_,0);
+    r_mu.assign(maxElement_,0);
 
-    for (int j=0; j<numberOfValues; j++){  
-      for (int i=0; i< Ensemble ; i++){
-        x_mu[j]=x_mu[j] + 1.0*dx[i][j]/Ensemble;
-        y_mu[j]=y_mu[j] + 1.0*dy[i][j]/Ensemble;
-        z_mu[j]=z_mu[j] + 1.0*dz[i][j]/Ensemble;
-        //  r_mu[j]=r_mu[j] + 1.0*dr[i][j]/Ensemble;  //I'm not using this.
+    for (int j=0; j < maxElement_; j++){  
+      for (int i = 0; i < Ensemble ; i++){
+        x_mu[j] = x_mu[j] + 1.0*store_dx[i][j] / Ensemble;
+        y_mu[j] = y_mu[j] + 1.0*store_dy[i][j] / Ensemble;
+        z_mu[j] = z_mu[j] + 1.0*store_dz[i][j] / Ensemble;
+        //r_mu[j] = r_mu[j] + 1.0*store_dr[i][j] / Ensemble; //not using this
       } 
     }
 
     //Compute <R^2>:
-    x2_mu.assign(numberOfValues,0);
-    y2_mu.assign(numberOfValues,0);
-    z2_mu.assign(numberOfValues,0);
-    r2_mu.assign(numberOfValues,0);
+    x2_mu.assign(maxElement_,0);
+    y2_mu.assign(maxElement_,0);
+    z2_mu.assign(maxElement_,0);
+    r2_mu.assign(maxElement_,0);
 
-    for (int j=0; j<numberOfValues; j++){  
-      for (int i=0; i<Ensemble ;i++){
-        x2_mu[j]=x2_mu[j] + 1.0*pow(dx[i][j],2)/Ensemble;
-        y2_mu[j]=y2_mu[j] + 1.0*pow(dy[i][j],2)/Ensemble;
-        z2_mu[j]=z2_mu[j] + 1.0*pow(dz[i][j],2)/Ensemble;
-        r2_mu[j]=r2_mu[j] + 1.0*pow(dr[i][j],2)/Ensemble;
+    for (int j = 0; j < maxElement_; j++){  
+      for (int i = 0; i < Ensemble;i++){
+        x2_mu[j] = x2_mu[j] + 1.0 * pow(store_dx[i][j],2) / Ensemble;
+        y2_mu[j] = y2_mu[j] + 1.0 * pow(store_dy[i][j],2) / Ensemble;
+        z2_mu[j] = z2_mu[j] + 1.0 * pow(store_dz[i][j],2) / Ensemble;
+        r2_mu[j] = r2_mu[j] + 1.0 * pow(store_dr[i][j],2) / Ensemble;
       }
     }
 
     //Calculate standard error, to generate error-bars
     //this function must come after x2_mu...r2_mu has been
     //computed.
-    stdErr(Ensemble);
+    computeStdErr(Ensemble);
+
+    computePearsonCoeff(Ensemble);
+
   }
   else{
     //use the memmory conserving version instead. This one does not
     //use the dx[][]-matrix, and in that way we save lots of mem.
-    stdErrLowMem(Ensemble);
+    computeStdErrLowMem(Ensemble);
   }
-
 
 
   //To print which distribution we used to head of output-file
@@ -1323,16 +1523,22 @@ void Partiklar::save(int Ensemble, char name[]){
   cout << endl << print.str();
 
 
+  if(lowMem_)  //NOTE: temporary, if lowMem is on!
+    //TODO: calculate this even if lowMem_ = true!
+    //does not serve any purpose at this point. 
+    pearsonCorrelation_.assign(maxElement_,0);
+  
   //print data to file:
-  for (int i=0; i < numberOfValues; i++){
-
+  for (int i = 0; i < maxElement_; i++){
+    
     //Maybe add this:
     //cout << setprecision (5) << r2_mu[i] << ...
 
     //Print it to file:
-    primary  << t[i]<<"\t"<<r2_mu[i]<<"\t" <<r2_err[i]<<endl;  //skiter i "r"
+    primary  << samplingTime_[i] << "\t" << r2_mu[i] << "\t" 
+             << r2_err[i] << "\t" << pearsonCorrelation_[i] << endl;
     if(xyz){
-      secondary<< t[i]<<"\t"<< x_mu[i] <<"\t"<< y_mu[i] <<"\t"<< z_mu[i] <<"\t"
+      secondary<< samplingTime_[i]<<"\t"<< x_mu[i] <<"\t"<< y_mu[i] <<"\t"<< z_mu[i] <<"\t"
                << x2_mu[i] <<"\t"<< y2_mu[i] <<"\t"<< z2_mu[i] <<"\t"
                << x2_err[i]<<"\t"<<y2_err[i]<<"\t"<<z2_err[i]<<endl;
     }
@@ -1342,49 +1548,49 @@ void Partiklar::save(int Ensemble, char name[]){
 }
 
 
-void Partiklar::stdErr(int Ensemble){
+void Partiklar::computeStdErr(int Ensemble){
   //Calculate the standard deviation, to get error-bars.
-  int numberOfValues = t.size();
-
-  //Should not be using this function if LowMem=true!
-  if(LowMem_)
+  
+  //Should not be using this function if lowMem=true!
+  if(lowMem_)
     printError("LowMem switch ON, but using wrong stdErr-function!");
+  
+  x2_err.assign(maxElement_,0);
+  y2_err.assign(maxElement_,0);
+  z2_err.assign(maxElement_,0);
+  r2_err.assign(maxElement_,0);
 
-  x2_err.assign(numberOfValues,0);
-  y2_err.assign(numberOfValues,0);
-  z2_err.assign(numberOfValues,0);
-  r2_err.assign(numberOfValues,0);
 
-
-  for (int j=0; j < numberOfValues  ;j++){
-    for (int i=0; i<Ensemble ; i++){
-      x2_err[j]=x2_err[j] + pow( pow(dx[i][j],2) - x2_mu[j] ,2);
-      y2_err[j]=y2_err[j] + pow( pow(dy[i][j],2) - y2_mu[j] ,2);
-      z2_err[j]=z2_err[j] + pow( pow(dz[i][j],2) - z2_mu[j] ,2);
-      r2_err[j]=r2_err[j] + pow( pow(dr[i][j],2) - r2_mu[j] ,2);
-    }
+  for (int j=0; j < maxElement_; j++){
+    for (int i=0; i<Ensemble; i++){
+      x2_err[j] += pow (pow(store_dx[i][j],2) - x2_mu[j] ,2);
+      y2_err[j] += pow (pow(store_dy[i][j],2) - y2_mu[j] ,2);
+      z2_err[j] += pow (pow(store_dz[i][j],2) - z2_mu[j] ,2);
+      r2_err[j] += pow (pow(store_dr[i][j],2) - r2_mu[j] ,2);
+    }//( "a += b" is the same as "a = a + b")
   }
 
-  for (int j=0; j < numberOfValues  ;j++){
-    x2_err[j]=sqrt( x2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
-    y2_err[j]=sqrt( y2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
-    z2_err[j]=sqrt( z2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
-    r2_err[j]=sqrt( r2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
-  }     //Då E=1 --> inf !
+  for (int j=0; j < maxElement_  ;j++){
+    x2_err[j] = sqrt( x2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
+    y2_err[j] = sqrt( y2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
+    z2_err[j] = sqrt( z2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
+    r2_err[j] = sqrt( r2_err[j] / (1.0*Ensemble*(Ensemble-1)) );
+  } //for E=1 --> inf !
 
   
   //Testing the Gaussian distribution of the points:
-  //--------------------------------------------------------------------
-  float SUM68=0;
-  for (int j=0; j < numberOfValues; j++){    //forgot about his: 
-    double top = x2_mu[j] +0.5*x2_err[j] *   sqrt(Ensemble-1)*2;
-    double bot = x2_mu[j] -0.5*x2_err[j] *   sqrt(Ensemble-1)*2;
+  //--------------------------------------------------
+  float SUM68 = 0;
+  for (int j = 0; j < maxElement_; j++){    //forgot about his: 
+    double top = x2_mu[j] +0.5*x2_err[j] * sqrt(Ensemble-1)*2;
+    double bot = x2_mu[j] -0.5*x2_err[j] * sqrt(Ensemble-1)*2;
     for (int i=0; i < Ensemble; i++){
-      if (bot <= pow(dx[i][j],2) &&  top >= pow(dx[i][j],2) ){
+      if (bot <= pow(store_dx[i][j],2) && 
+          top >= pow(store_dx[i][j],2) ){
         bool test = false;
         if (test){ //TEST-function
           cout <<"lower limit: "<< bot <<endl;
-          cout << "point is: "<< pow(dx[i][j],2) <<endl;
+          cout << "point is: "<< pow(store_dx[i][j],2) <<endl;
           cout << "upper limit: "<< top <<endl;
         }
         SUM68++;
@@ -1392,45 +1598,44 @@ void Partiklar::stdErr(int Ensemble){
       }
     }
   }
-  cout <<"68,2 % (?)="<<1.0*SUM68/(Ensemble*numberOfValues)<<endl;
+  cout <<"68,2 % (?)="<<1.0*SUM68/(Ensemble*maxElement_)<<endl;
 
-  //--------------------------------------------------------------------
+  //--------------------------------------------------
 }
 
 
-void Partiklar::stdErrLowMem(int Ensemble){
-  int numberOfValues=t.size();
+void Partiklar::computeStdErrLowMem(int Ensemble){
 
-  if(!LowMem_)
-    printError("LowMem=OFF, but using stdErrLowMem()-func!");
+  if(!lowMem_)
+    printError("lowMem=OFF, but using stdErrLowMem()-func!");
 
   //Devide the summed up displacement to get the average:
-  for (int i=0; i< numberOfValues; i++){
-    x2_mu[i]=x2_mu[i]/(Ensemble*1.0);
-    y2_mu[i]=y2_mu[i]/(Ensemble*1.0);
-    z2_mu[i]=z2_mu[i]/(Ensemble*1.0);
-    r2_mu[i]=r2_mu[i]/(Ensemble*1.0);
+  for (int i=0; i< maxElement_; i++){
+    x2_mu[i] = x2_mu[i] / (Ensemble * 1.0);
+    y2_mu[i] = y2_mu[i] / (Ensemble * 1.0);
+    z2_mu[i] = z2_mu[i] / (Ensemble * 1.0);
+    r2_mu[i] = r2_mu[i] / (Ensemble * 1.0);
   }
 
-  x2_err.assign(numberOfValues,0);
-  y2_err.assign(numberOfValues,0);
-  z2_err.assign(numberOfValues,0);
-  r2_err.assign(numberOfValues,0);
+  x2_err.assign(maxElement_,0);
+  y2_err.assign(maxElement_,0);
+  z2_err.assign(maxElement_,0);
+  r2_err.assign(maxElement_,0);
 
   //Following the notation in the comments in Partiklar::store():
   // [1/N sum_i^N a_i^2] - [<a>^2], (a=dr^2)
-  for(int i =0; i < numberOfValues; i++){
-    x2_err[i] = dx4_err[i]/(1.0*Ensemble) - pow( x2_mu[i] ,2);
-    y2_err[i] = dy4_err[i]/(1.0*Ensemble) - pow( y2_mu[i] ,2);
-    z2_err[i] = dz4_err[i]/(1.0*Ensemble) - pow( z2_mu[i] ,2);
-    r2_err[i] = dr4_err[i]/(1.0*Ensemble) - pow( r2_mu[i] ,2);
+  for(int i =0; i < maxElement_; i++){
+    x2_err[i] = dx4_err[i] / (1.0 * Ensemble) - pow( x2_mu[i] ,2);
+    y2_err[i] = dy4_err[i] / (1.0 * Ensemble) - pow( y2_mu[i] ,2);
+    z2_err[i] = dz4_err[i] / (1.0 * Ensemble) - pow( z2_mu[i] ,2);
+    r2_err[i] = dr4_err[i] / (1.0 * Ensemble) - pow( r2_mu[i] ,2);
   }
 
-  for(int i =0; i < numberOfValues; i++){
-    x2_err[i] = sqrt(x2_err[i]/(1.0*(Ensemble-1)));
-    y2_err[i] = sqrt(y2_err[i]/(1.0*(Ensemble-1)));
-    z2_err[i] = sqrt(z2_err[i]/(1.0*(Ensemble-1)));
-    r2_err[i] = sqrt(r2_err[i]/(1.0*(Ensemble-1)));
+  for(int i =0; i < maxElement_; i++){
+    x2_err[i] = sqrt(x2_err[i] / (1.0 * (Ensemble - 1) ));
+    y2_err[i] = sqrt(y2_err[i] / (1.0 * (Ensemble - 1) ));
+    z2_err[i] = sqrt(z2_err[i] / (1.0 * (Ensemble - 1) ));
+    r2_err[i] = sqrt(r2_err[i] / (1.0 * (Ensemble - 1) ));
   }
 }
 
@@ -1445,14 +1650,14 @@ void Partiklar::stdErrLowMem(int Ensemble){
 int main(int argc, char* argv[]){
   int N;                              //Number of particles
   int X,Y,Z;                          //lattice size
-  int ensemble,antal_punkter;
-  double MaxTime;
+  int ensemble,antalPunkter;
+  double maxTime;
 
   //DEFAULT VALUES:  
   bool fixBoundaryOn = FIXBOUNDARY;     //boundary condition, false = periodic
   bool logscale = false;
   bool nymetod = true;                  //use move() instead of moveOld()
-  bool UseLowMem = LOWMEM;              //TODO! Patch this to the -m flag!
+  bool UseLowMem = false;               //don't save memory
   bool quiet = false;                   //print remaining ensembles during simulation
   //--------------
 
@@ -1462,7 +1667,7 @@ int main(int argc, char* argv[]){
   bool InteractOn = false;
 
   //change default values depending on arg. flags given
-  argumentFlags(argc, argv, logscale, InteractOn,
+  argumentFlags(argc, argv, logscale,UseLowMem, InteractOn,
                 quiet, InteractStr, NameOfFile);
 
   //TEST print result to screen:
@@ -1475,26 +1680,23 @@ int main(int argc, char* argv[]){
       <<"###filename = "<<(string) NameOfFile<<endl;
   //-----------------------
 
-
   if (fixBoundaryOn) 
     cout <<"# Fix boundary"<<endl;  
   else 
     cout <<"# Periodic boundary"<<endl;
 
-
-  AskUserForInputParameters(X,Y,Z,N,ensemble,antal_punkter,MaxTime);
-
+  AskUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
 
   Partiklar crowd(X,Y,Z,N,fixBoundaryOn);
   
   
   if(InteractOn)                           //use Interaction algorithm
-    crowd.set_interaction(InteractStr);    //with "InteractStr" strength.
+    crowd.setInteraction(InteractStr);    //with "InteractStr" strength.
 
 
   //kanske ha den som invariabel i Save() istallet?
   //Set the switch true/false for use of low-mem run
-  crowd.set_LowMem(UseLowMem, antal_punkter);
+  crowd.setLowMem(UseLowMem);
 
   static Ran tempnumb(17);                 //just anny seed will do
   vector<Jump> hopRate;
@@ -1526,7 +1728,7 @@ int main(int argc, char* argv[]){
         float y_c = 1.0;               //used in option 2 Power-law
         float alpha = 0.5;               //used in option 2 Power-law
         float jumpCrowders = JUMPRATE_CROWDER; //used in option 3 Nakazato
-        crowd.set_jumpNaka(jumpCrowders, jumpTracer); 
+        crowd.setJumpNaka(jumpCrowders, jumpTracer); 
 
         switch(n){
         case 0:           
@@ -1550,7 +1752,7 @@ int main(int argc, char* argv[]){
           Info = jumpTracer/jumpCrowders;
           break;
         }
-        crowd.set_dist(n,Info);
+        crowd.setDist(n,Info);
       }
       else{
         if (n>3 || n <0 ) 
@@ -1583,13 +1785,30 @@ int main(int argc, char* argv[]){
     crowd.setJumpRate(hopRate);
   }
 
-
-  //double dt = crowd.get_dt();  //Only used this when I used my heatmap-function
-
-  //if logaritmic spaceing between data points
-  double delta_t = 1.0*MaxTime/antal_punkter;
-  double delta_log_t = 1.0*log(MaxTime)/antal_punkter;    
   
+  //make vector of sampling times
+  vector<double> samplingTimes;
+  if(!logscale){
+    double minTime = 1;    
+    double deltaTime = (double) (maxTime - minTime) / antalPunkter;
+    double timeSum = minTime; //start time
+    for (int i = 0; i < antalPunkter; i++){
+      samplingTimes.push_back(timeSum);
+      timeSum = timeSum + deltaTime;
+    }
+  }
+  else{
+    //NOTE should take difference log(stop) - log(1) 
+    double deltaTimeLog = (double) log(maxTime)/antalPunkter;
+    double logTimeSum = log(1);
+    while (logTimeSum < log(maxTime)){
+      logTimeSum = logTimeSum + deltaTimeLog;
+      samplingTimes.push_back( exp(logTimeSum) );
+    }
+  }
+  crowd.setSamplingTimes(samplingTimes);
+  
+
   //TEST:
   //====================
   //When I use the inteeraction code, make sure I have Nakazato distribution
@@ -1598,14 +1817,14 @@ int main(int argc, char* argv[]){
       (JUMPRATE_CROWDER!=JUMPRATE_TRACER && DISTRIBUTION==3 && InteractOn)){
     cout<<endl<<"WARNING!! USING INTERACTION-CODE BUT NOT IDENTICAL JUMPRATES! \a"
         <<endl<<endl;
-    //TODO! Whis isn't it working!
+    //TODO! Why isn't it working!
     // char answer;
     // cout <<"Abort simulation? y/n:"<<endl;
     // cin >> answer;
     // cin.ignore();
-    // answer=getchar();
-    // answer=getchar();
-    // answer=getchar();
+    // answer = getchar();
+    // answer = getchar();
+    // answer = getchar();
     // if (answer == 'y') 
     //   abort();
   }
@@ -1614,61 +1833,36 @@ int main(int argc, char* argv[]){
   //non-important nice-to-have simulation info.
   RemainingTime printToScreen(ensemble);  
 
-  for(int E=0; E < ensemble; E++){
+  for(int E = 0; E < ensemble; E++){
 
-    if (!quiet)
-      printToScreen.printProgress(E);
+    if (!quiet)  printToScreen.printProgress(E);
                   
-    vector<int> x_disp, y_disp, z_disp;
-    vector<double> r_disp;
     crowd.place();
-
-    double t_output=0;
-    int n=1;
-    double totalTime;
-    for (totalTime=0; totalTime <= MaxTime; totalTime = crowd.get_time()){
-
-      if (totalTime >= t_output ){ //&& totalTime < t_output_next){
-        crowd.set_dt();                            //Save the time
-        x_disp.push_back(crowd.get_dX());          //get displacement
-        y_disp.push_back(crowd.get_dY());
-        z_disp.push_back(crowd.get_dZ());
-        r_disp.push_back(crowd.get_dR());
-
-        if(logscale){
-          t_output = exp(delta_log_t *1.0*n);
-        }
-        else{  //t_output = t_output + delta_t;
-          t_output = 1.0* n * delta_t;
-        }
-        
-        n++;
-      } //run this loop "antal_punkter"-times
-
-      //(nymetod) ? crowd.move() : crowd.moveOld();
-      crowd.move(); //faster I would guess... (moveOld() is obsolete)
-
-      // //TEST: to get a snapshot close to the MaxTime
-      // if(totalTime>=MaxTime-0.01){
-      //   crowd.Snapshot();
-      //   cout<<"totalTime:"<<totalTime<<endl;
-      // }
-
-
-      if(InteractOn){//INTERACTION
-        //This is just to save the information of clustersize distribution
-        //crowd.saveCluster(totalTime);
-      }//BUG Augusti, gar otroligt trogt med denna!
     
-    }
-    //TODO: sista värdena skrivs aldrig ut, loopen slutar före utskriften...
-    //...det är give or take, för vill att den börjar i nollan.
+    //(nymetod) ? crowd.move() : crowd.moveOld();
+    crowd.move(); //faster I would guess... (moveOld() is obsolete)
+
+    //make a print out of individual ensemble:
+    //crowd.dumpSimulation(E);
     
+    // //TEST: to get a snapshot close to the MaxTime
+    // if(totalTime>=MaxTime-0.01){
+    //   crowd.Snapshot();
+    //   cout<<"totalTime:"<<totalTime<<endl;
+    // }
 
-    //Store tracer position at each point for each ensemble,
-    //inorder to get errorbars (and to bin and get a histogram of P(x,t))
-    crowd.store(x_disp, y_disp, z_disp, r_disp); 
 
+    // TODO: ej uppdaterad efter min move()-implementering!
+    //  if(InteractOn){//INTERACTION
+    //     This is just to save the information of cluster-size distribution
+    //     crowd.saveCluster(totalTime);
+    // }//BUG Augusti, gar otroligt trogt med denna!
+    
+    
+    //Store tracer position at each point for this ensemble, needed by
+    //class to compute standard error/deviation. (+for binning, etc.)
+    crowd.store(); 
+    
   }
 
   if(InteractOn){//INTERACTION
@@ -1690,8 +1884,8 @@ int main(int argc, char* argv[]){
 //////////////////////////////////
 
 
-void Partiklar::setJumpRate(vector<Jump> jumpRate){
-  if (jumpRate.size() == nParticles_){
+void Partiklar::setJumpRate(vector<Jump>& jumpRate){
+  if ( (int) jumpRate.size() == nParticles_){
 
     // remove jumprates from previous runs 
     // but now we are quenched so not needed (I think) TODO (is this right?)
@@ -1711,7 +1905,7 @@ void Partiklar::setJumpRate(vector<Jump> jumpRate){
 }
 
 
-void Partiklar::computePartialSum(){
+void Partiklar::computePartialSum(void){
   long double tmp = 0;
   int i;
 
@@ -1722,7 +1916,7 @@ void Partiklar::computePartialSum(){
   partialSum_.push_back(tmp);
                                
   //check the jump-rate-vectors  
-  if ( jumpRate_.size()!=nParticles_ )
+  if ( (int) jumpRate_.size() != nParticles_ )
     printError("Error in number of jumprates, != N");
   
   //build partialSum-vector
@@ -1758,7 +1952,7 @@ void Partiklar::computePartialSum(){
   }
 
   //TEST: It must increase monotonically:
-  for (int i = 1; i < partialSum_.size(); i++){
+  for (int i = 1; i < nParticles_; i++){
     if (partialSum_[i] < partialSum_[i-1] ){
       cout <<"Warning! The cumulative sum of jump rates is not "<<endl
            <<"a monotonically increasing sum!"<<endl;
@@ -1770,7 +1964,7 @@ void Partiklar::computePartialSum(){
 
 int Partiklar::convertMuToParticle(int mu, int& n){
 
-  if (0 <= mu && mu <= partialSum_.size() -1){
+  if (0 <= mu && mu <= (int) partialSum_.size() -1){
 
     if ( 0 <= mu && mu <=2*nParticles_-1 ){
       if ( mu<=nParticles_-1 ){               
@@ -1818,11 +2012,11 @@ int Partiklar::convertMuToParticle(int mu, int& n){
 double Partiklar::diffEffConstant(void){
   double D_eff;
   
-  if(!partialSum_.empty()){ //Calculate If we use jumpratios (as opposed to moveOld())
+  if(!partialSum_.empty()){ 
 
-    //NOTE: if the lattice constant: a!=1, it must be included
+    //NOTE: if the lattice constant: a != 1, it must be included
     //D_i=k_i * pow(a,2)
-    double sum_temp=0;
+    double sum_temp = 0;
   
     if (dim_ >= 1){
       for (int i=0; i < nParticles_; i++){
@@ -1849,19 +2043,20 @@ double Partiklar::diffEffConstant(void){
     D_eff = 1.0 / sum_temp;
 
     //Calculate Average as well:
-    D_av_=0;
-    for (int i=0; i < nParticles_; i++){
+    D_av_ = 0;
+    int startingParticle = 1;  //don't include the tagged
+    for (int i = startingParticle; i < nParticles_; i++){
       D_av_ = D_av_ + jumpRate_[i].x.r;
       D_av_ = D_av_ + jumpRate_[i].x.l;
     }
     if(dim_ > 1){
-      for (int i=0; i < nParticles_; i++){
+      for (int i = startingParticle; i < nParticles_; i++){
         D_av_ = D_av_ + jumpRate_[i].y.r;
         D_av_ = D_av_ + jumpRate_[i].y.l;
       }
     }
     if (dim_>2){
-      for (int i=0; i < nParticles_; i++){
+      for (int i = startingParticle; i < nParticles_; i++){
         D_av_ = D_av_ + jumpRate_[i].z.r;
         D_av_ = D_av_ + jumpRate_[i].z.l;
       }
@@ -1893,14 +2088,14 @@ double Partiklar::diffEffConstant(void){
   -remove various testing-loops
   -plot directly with gnuplot.
   -remove the set_interaction --> constructor! (doesn't work)
-  -clean up main-fuction get-set-calls
   -rename all variables using camelCase
-  -activate the m-flag!
-  -remove the set_time, +3-4 get-functions...
-  -exponential waiting time!
   -kanske ha en MSD-klass, double x y z r?
   -ta bort dx dy dz dr.
   -kompilera med -Wall -pedantic
+  -use __LINE__ to print line-number where error occured
+  -use exceptions perhaps?
+  -compare NRvector vs std::vector, for speed?
+  
 */
 
 //There are various testing functions in here, but they are either silenced by use of if-statements in combination with a boolean "test" variable set to false, or just commented out. A lot of work went into testing the output, therefore some things can seem redundant, such as printing un-squared displacements (<dx>~0) etc. 
@@ -1930,3 +2125,91 @@ double Partiklar::diffEffConstant(void){
  [make the actual move]     [make the actual move]
 
 */
+
+/*
+Change Log:
+==========
+
+version 6 
+---------
+NOTE: from this version forward the output is not comparable to 
+previous simulations, by use of the "diff"-command, since I now have
+a new algorithm to set the sampling times! The simulation result is 
+still the same, physically, but not truly identical.
+
+-changed the calculation of average diffusion constant to omit the
+tagged particle.
+-activated the LowMem command flag ('-m')
+-resolved the spaghetti that was my sampling time code. In doing so,
+removed get_[dx,dy,dz,dr], set_dt, etc, and other garbage
+-renamed the matrices dx,dy,dz,dr to store_dx, store_dy. etc
+-new single row vector called dx,dy,dz,dr, to store the displacement
+for an ensemble. these are then stored in store_dx, store_dy, etc.
+-made a template of the getNonCommentInput function, and removed the 
+two functions specific for int/double return value. (in auxilary.cpp) 
+-created the computeWaitingTime()-method, and encapsulated the move()
+function in a while(time is still running) condition.
+-changed the logarithmic spacing between the data points, to be more 
+like the algorithm in the Gillespie-source code. 
+-Calculate the pearsonCoefficient, and print it to the output as a 
+fourth column. This is work in progress. Not complete. This also 
+depends on a LU-decomposition and adds the dependency to ludcmp.h 
+
+
+version 5:
+---------
+Note: this is the last version that gives output-files that are comparable 
+with all previous simulations used in my master thesis, and elsewhere.  
+
+-removed the six jump-rate vectors, and the three overloaded setJumpRate-
+functions. Implemented a new Jump class, with members .x.r, .x.l, .y.r, etc.
+
+-I do have an auxilary.h file
+ 
+
+version 4:
+---------
+????
+
+
+-removed the Xpos, Ypos, Zpos vectors and made the class Particle, to
+store the position of the particles:
+(Particle pos[i].x pos[i].y was Xpos[i], Ypos[i] etc.) 
+
+
+
+version 3
+---------
+Just stating what it looks like:
+-all vectors normal int/double, ie. 3 for pos. + 6 for jumprate 
+-Uses auxilary.cpp (no h-file)
+-has quiet-flag
+-has LowMem
+-interaction + (normal) hardcore interaction merged
+
+version 2.5
+-----------
+-merged the two seperate codes prog.cpp + progInteraction.cpp
+into one single file. progInteraction.cpp was the one I previously 
+used for particles with an attractive potential. (see Master thesis.)
+-I ran many test to see that nothing got messed up when I merged them,
+but it was straight forward. only one if-statement, basically, to 
+check if we should use the interaction algorithm.   
+
+
+version 2
+---------
+-Last version with prog.cpp and progInteraction.cpp separate. 
+
+
+-Fixed serious bug in original Gillespie code for finding the right mu. 
+It got stuck in an infinite loop for large simulations.
+
+-all versions see a continuous revision of comments and naming of 
+variables, as I have been consistently inconsistent in the naming convention.
+(See README.txt for my new rules on how to do this)
+
+
+*/
+
+

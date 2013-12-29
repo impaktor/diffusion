@@ -15,10 +15,12 @@ Particle::Particle(int X, int Y, int Z){
   z = Z;
 }
 
-Jump::Jump(double right, double left){
+
+Direction::Direction(double right, double left){
     r = right;
     l = left;
 }
+
 
 //overloading the << operator for the Particle class.
 //Taken from http://www.learncpp.com/cpp-tutorial/

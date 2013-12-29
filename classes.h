@@ -1,12 +1,50 @@
-//Class to show runtime information, such as remainging time
-//until completion, and number of ensembles left. 
-
 #ifndef CLASSES_H
 #define CLASSES_H
 
 //#include <iostream>        //for cout, among others
 #include<time.h>
 
+//First three classes (Direction, Jump, Particle), will allow us to 
+//get the position of a Particle object as: object.x, and the jump 
+//rate as object.rate.x.r etc.
+
+class Direction{
+public:
+  Direction(double right,double left);
+  Direction(void){};
+  double r;  //right
+  double l;  //left
+};
+
+class Jump{
+public:
+  Direction x; //i.e. x.r and x.l
+  Direction y;
+  Direction z;
+};
+
+class Particle{
+public:
+  Particle(int,int,int);
+  Particle(void){};
+  int x;            //position x
+  int y;
+  int z;
+  
+  Jump rate;        //jump rate: rate.x.r
+
+  //This allows us to print x,y,z with the << operator
+  //like: Particle particle(1,4,2);  cout << particle <<endl; 
+  friend std::ostream& operator<< (std::ostream &out, Particle &particle); 
+  friend std::istream& operator>> (std::istream &in, Particle &particle); 
+};
+
+
+
+
+
+//Class to show runtime information, such as remainging time
+//until completion, and number of ensembles left. 
 class RemainingTime{
 private:
   time_t startTime_;
@@ -17,45 +55,11 @@ public:
   void printProgress(unsigned int);  //print progress to screen
 };
 
-class Jump{
-public:
-  Jump;
-  Direction x;
-  Direction y;
-  Direction z;
-};
-
-class Direction{
-public:
-  Direction(double right,double left);
-  Direction(void){};
-  double r;  //right
-  double l;  //left
-};
-
-class Particle{
-public:
-  Particle(int,int,int);
-  Particle(void){};
-  int x;
-  int y;
-  int z;
-  
-  Jump rate;
-
-  //we only use this for the tracer particle:
-  //double r;
-  
-  //This allows us to print x,y,z with the << operator
-  //like: Particle particle(1,4,2);  cout << particle <<endl; 
-  friend std::ostream& operator<< (std::ostream &out, Particle &particle); 
-  friend std::istream& operator>> (std::istream &in, Particle &particle); 
-
-};
-
-
 
 #endif
+
+
+
 
 /*
 #include <iostream.h>

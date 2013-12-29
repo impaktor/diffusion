@@ -9,8 +9,9 @@
 
 using namespace std;
 
-void argumentFlags(int argc, char** argv, bool& logarithm, bool& interactionON,
-                   bool& quiet, int& interaction_strength, char ReturnFileName[]){
+void argumentFlags(int argc, char** argv, bool& logarithm, bool& low_mem,
+                   bool& interactionON, bool& quiet, int& interaction_strength, 
+                   char ReturnFileName[]){
   
   char* file_name = ReturnFileName;
   char* default_file_name = file_name;
@@ -18,42 +19,39 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& interactionON,
   bool changed_file_name = false;
   bool error = false;
 
-  //TODO: flytta in som arg.
-  bool low_mem = false;
-
   int c;
   opterr=0;
 
   while((c = getopt(argc,argv,"lhmqw:o:i:"))!=-1)
     switch (c){
     case 'l':
-      logarithm=true;
+      logarithm = true;
       break;
     case 'm':
-      low_mem=true;
+      low_mem = true;
       break;
     case 'h':
       printHelp(default_file_name,argv);
       break;
     case 'q':
-      quiet=true;
+      quiet = true;
       break;
     case 'w':
       file_name = optarg;
-      changed_file_name=true;
+      changed_file_name = true;
       break;
     case 'o':
       file_name = optarg;
-      changed_file_name=true;
+      changed_file_name = true;
       break;
     case 'i':
       interaction_strength = atoi(optarg);
-      interactionON=true;
-      if (interaction_strength<0) error=true;
+      interactionON = true;
+      if (interaction_strength<0) error = true;
       break;
     case '?':
-      error=true;
-      if (optopt=='w' || optopt=='o'|| optopt=='i')
+      error = true;
+      if (optopt =='w' || optopt =='o'|| optopt =='i')
         fprintf(stderr, "Option -%c requires an argument. \n",optopt);
         //cout<<"option "<<(char) optopt<<" requires an argument"<<endl;
       else if(isprint(optopt))
@@ -71,8 +69,8 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& interactionON,
 
   //print error message if we entered case '?' above
   if(error){
-    cout<<argv[0]<<": undefined entry."<<endl
-        <<"Try \""<<argv[0]<<" -h\" for help."<<endl;
+    cout << argv[0] << ": undefined entry." << endl
+        << "Try \"" << argv[0] << " -h\" for help." << endl;
     exit(1);
   }
 
@@ -82,24 +80,24 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& interactionON,
   int index;
   bool more_than_one_invalid_argument = (changed_file_name) ? true : false;
 
-  for(index=optind; index < argc; index++){
+  for(index = optind; index < argc; index++){
     //only run first iteration & if we didn't change filename (with w|f) 
     if(!more_than_one_invalid_argument){
-      file_name=argv[index];
-      changed_file_name=true;
+      file_name = argv[index];
+      changed_file_name = true;
     }
 
     //run for all invalid arguments except the first one
     if(more_than_one_invalid_argument)
       printf("Non-option argument %s\n",argv[index]);
 
-    more_than_one_invalid_argument=true;
+    more_than_one_invalid_argument = true;
   }
 
   if(changed_file_name)
-    cout<<"### Default output file changed to: "<<file_name<<endl;
+    cout << "### Default output file changed to: " << file_name << endl;
   else
-    file_name=default_file_name;
+    file_name = default_file_name;
 
   //cout<<endl<<"#TEST001: filename="<<(string) file_name<<endl;
 
@@ -110,31 +108,47 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& interactionON,
 }
 
 
+template <class T>
+T getNonCommentInput(void){
+  //small function to allow comments in the input-file.
+  //this will ignore any line containing "#", since it
+  //only wants numbers.
+
+  char invalue[999];
+
+  for(bool repeat = true; repeat;){
+    cin >> invalue;
+    if(strchr(invalue,'#') == NULL)
+      repeat = false;
+  }
+
+  return (T) atof(invalue);
+}
+
 void AskUserForInputParameters(int& xdim, int& ydim, int& zdim,
                                int& particleNumber, int& ensembles, 
                                int& number_of_values, double& stopTime){
   cout <<"# Specify number of lattice sites in:"<<endl;
   cout <<"# X: ";
-  xdim = getNonCommentIntInput(); //ignore lines containing '#'
+  xdim = getNonCommentInput<int>(); //ignore lines containing '#'
   cout<<"# Y: ";
-  ydim = getNonCommentIntInput(); //ignore lines containing '#'
+  ydim = getNonCommentInput<int>(); //ignore lines containing '#'
   cout<<"# Z: ";
-  zdim = getNonCommentIntInput(); //ignore lines containing '#'
+  zdim = getNonCommentInput<int>(); //ignore lines containing '#'
 
   cout <<"# Total number of particles: ";
-  particleNumber = getNonCommentIntInput();
+  particleNumber = getNonCommentInput<int>();
 
   float info = 1.0*(xdim*ydim*zdim)/particleNumber;
  
   cout <<"# Number of vacant sites/particle: "<<info<<endl;
   cout <<"# Number of ensembles: ";
-  ensembles = getNonCommentIntInput();
+  ensembles = getNonCommentInput<int>();
   cout <<"# Number of data-values to save: ";
-  number_of_values=getNonCommentIntInput();
+  number_of_values = getNonCommentInput<int>();
   cout <<"# Stop-time: ";
-  stopTime = getNonCommentDoubInput();
+  stopTime = getNonCommentInput<double>();
   cout << endl<<endl;
-  
 }
 
 
@@ -275,41 +289,22 @@ int main ( int argc, char *argv[] )
 */
 
 
-int getNonCommentIntInput(void){
-  //small function to allow comments in the input-file.
-  //this will ignore any line containing "#", since it
-  //only wants numbers.
-
-  char invalue[999];
-
-  for(bool repeat=true; repeat;){
-    cin>>invalue;
-    if(strchr(invalue,'#') == NULL)
-      repeat=false;
-  }
-
-  return atoi(invalue);
-}
-
-double getNonCommentDoubInput(void){
-  //small function to allow comments in the input-file.
-  //this will ignore any line containing "#", since it
-  //only wants numbers.
-
-  char invalue[999];
-
-  for(bool repeat=true; repeat;){
-    cin>>invalue;
-    if(strchr(invalue,'#') == NULL)
-      repeat=false;
-  }
-
-  return atof(invalue);
-}
-
 
 void printError(string message){
   cout << message << endl;
+  abort();
+}
+
+//use __FILE__ and __LINE__ macro to get line and filename;
+void printError(string message, int line){
+  cout <<"Error occured at line: " << line
+       << endl << message << endl;
+  abort();
+}
+
+void printError(string message, string file, int line){
+  cout <<"Error occured in file " << file << " at line: " << line
+       << endl << message << endl;
   abort();
 }
 

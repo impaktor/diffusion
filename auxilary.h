@@ -4,19 +4,20 @@
 #include <string>
 
 //This file contains implementations that have nothing to do with 
-//physics, such as print messages, ask for input parameters, read
-//command arguments (flags), print error messages.
+//physics, such as printing messages, ask for input parameters, read
+//command arguments (flags), print error messages, ignore commented 
+//lines, etc.
 
-void printHelp(char*, char**);
-
-void argumentFlags(int, char**, bool&, bool&, bool&, int&, char[]);
+//only these functions needs to be accessible from the "outside",
+void argumentFlags(int, char**, bool&, bool&, bool&, bool&, int&, char[]);
 
 void AskUserForInputParameters(int&, int&, int&, int&, int&, int&, double&);
 
-int getNonCommentIntInput(void);
+void printError(std::string message);
+void printError(std::string message, int line);
+void printError(std::string message, std::string file, int line);
 
-double getNonCommentDoubInput(void);
-
-void printError(std::string);
+//only used by AskUserForInputParameters():
+void printHelp(char*, char**);
 
 #endif
