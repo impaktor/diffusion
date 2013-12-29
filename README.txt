@@ -62,8 +62,6 @@ make zip       Create prog.zip with all needed source files.
 make clean     Remove all binary object files (*.o) 
 make tags      Create a Tags-file for Emacs. Use M-. in emacs to navigate the files.
 make lines     Returns the total number of lines of code. ( :D ) 
-make -f Makefile_thread  use main_thread.cpp instead. Requires libboost_thread v. < 1.39 
-               to be installed.
 
 The Makefile will recompile any files that have been changed and all files that depend on it, thus speeding up the compilation, and always making sure the binary is correctly linked.
 
@@ -88,6 +86,7 @@ For help on command flags and arguments just run the program with the -h flag. F
            by using Brute force, i.e. Just rerun the simulation N times.
 -j         Turn on the jackknife algorithm to print out a corrected error to the screen
            and file appended with "_jackknife"
+-t k       Set the tracer jumprate to "k", where "k" is a float. Was previously hard coded.
 
 Dimension
 ---------
@@ -158,8 +157,17 @@ Also investigate convertMuToParticle for changing to binary search method. (TODO
 CHANGE LOG
 ==========
 
+version 9 (current)
+-------------------
+-(23/2 -11)To make the Lattice class be able to multi-thread, setting the Ran class (NR 3 ed.) as "static" is not optimal, since we will initiate several instances of the Lattice-class, and static reaches across the class encapsulation and we don't know what happens if two threads try to access the random number generator at the same time. Therefore, we initiate a single non-static random number generator in the class, that is only reachable for the members of that instance of the class. We do this by using initialization list in the class. This makes my simulation non-comparable with previous simulations, since I now only use one seed for each Lattice class instead of three (waiting time, place, and move).
+-All previous simulations ever made had the exact same distribution of crowders, i.e. "quenched", now I WILL change this, and start by moving the generation of jumprates to a separate function in the main() function.  
+-Added the 't' flag for setting the tracer jumprate, i.e. not needing to compile 22 
+ different binary files. Distribution, and nakazato crowding rate (k_c) is still 
+ hard coded. 
+
+
 version 8 (15/2 2011)
-----------------------------
+---------------------
 -Renamed "prog.cpp" to more appropriate "main.cpp".
 -Made a threading version of main.cpp, called main_thread.cpp. It uses the
  thread-package in the boost library. Increase in speed more than two-fold.
@@ -187,7 +195,7 @@ version 8 (15/2 2011)
  access to turn on/off of correlation function, and binning function.
 
 version 7 (Nov 2010)
----------
+---------------------
 -Renamed and split up my main (singleton) class to "Lattice"
 (lattice.[h,cpp])
 -Made my TESTinteraction.cpp (generally called "super interaction")

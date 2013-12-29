@@ -12,7 +12,7 @@
 void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
                    bool& interactionON, bool& quiet, int& interactionStrength,
                    std::string& returnFileName, int& noRuns, char& nMethod,
-                   bool& jackknife){
+                   bool& jackknife, float& tracer){
 
   char* fileName = NULL;
   bool changedFileName = false;
@@ -24,7 +24,7 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
   int c;
   opterr = 0;
 
-  while((c = getopt(argc,argv,"lhqmw:i:jB:b:")) != -1)
+  while((c = getopt(argc,argv,"lhqmw:i:jB:b:t:")) != -1)
     switch (c){
     case 'l':
       logarithm = true;
@@ -60,9 +60,13 @@ void argumentFlags(int argc, char** argv, bool& logarithm, bool& lowMem,
       noRuns = atoi(optarg);
       ++usingMultipleOutputs;
       break;
+    case 't':
+      tracer = atof(optarg);
+      break;
     case '?':
       error = true;
-      if (optopt =='w' || optopt =='i' || optopt =='B' || optopt =='b')
+      if (optopt =='w' || optopt =='i' || optopt =='B'
+          || optopt =='b' || optopt =='t')
         //fprintf(stderr, "Option -%c requires an argument. \n",optopt);
         std::cout << "Option -" << (char) optopt << " requires an argument"
                   << std::endl;

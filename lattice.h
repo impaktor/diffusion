@@ -17,8 +17,10 @@ private:
   void buildCluster2(int, vector<int>&, double);    //needed for save_cluster()-func.
 
 protected:
-  float interactionStrength_;               //only used if "InteractionOn=true"
-  void checkVacancyMatrix(float);           //test-function
+  Ran randomNumber;                        //generator accessible to all class members
+
+  float interactionStrength_;              //only used if "InteractionOn=true"
+  void checkVacancyMatrix(float);          //test-function
   void countNeighbours(Particle, vector<int>&);
 
   vector<Particle> pos_;                   //XYZ-position for each particle on the lattice
@@ -59,7 +61,7 @@ protected:
   double computeWaitingTime(void);
 
 public:
-  Lattice(int, int, int, int, bool);
+  Lattice(int, int, int, int, double, bool);
   void place(void);                        //Place particles on the lattice
   void moveOld(void);                      //old obsolete move-code (no jump-rates)
   void move(void);                         //pick a particle & direction based on jump-rate

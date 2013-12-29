@@ -18,20 +18,26 @@
 //#include <boost/thread/thread.hpp>
 
 //HARD-CODED VARIABLES:
-#define DISTRIBUTION     0          //0 = uniform, 1 = exponential,
+#define DISTRIBUTION     3          //0 = uniform, 1 = exponential,
 //                                    2 = power-law, 3 = nakazato
-#define JUMPRATE_TRACER  1          //
+#define JUMPRATE_TRACER  1          //default value
 #define JUMPRATE_CROWDER 0.5        //(if nakazato-distribution)
 #define FIXBOUNDARY      1          //1=fix wall, 0=periodic boundary
 #define EXPONENTAIL_WAITING_TIME 1
 
-#define SEED_JUMP         17
+const double SEED_JUMP     = 17;    //usually: 17
 
+const double SEED_LATTICE1 = 15;
+//const double SEED_LATTICE2 = 87;
+//const double SEED_LATTICE3 = 64;
+//const double SEED_LATTICE4 = 32;
 
+void computeJumpRates(vector<Jump>&, float&, const int,
+                      const float, const float);
 
 int main(int argc, char* argv[]){
-  int N;                             //Number of particles
-  int X,Y,Z;                         //lattice size
+  int N;                            //Number of particles
+  int X,Y,Z;                        //lattice size
   int ensemble,antalPunkter;
   double maxTime;
 
@@ -49,23 +55,24 @@ int main(int argc, char* argv[]){
   bool interactOn = false;          //don't use the interaction algorithm
   bool jackknife = false;           //if true: use jackknife, take lots of time
   char method;                      //use bootstrap ('b') or Brute force ('B')
+  float jumpTracer = JUMPRATE_TRACER; //k_t
 
   //change default values depending on arg. flags given on cmdline.
-  argumentFlags(argc, argv, logscale, useLowMem, interactOn, quiet,
-                interactStr, nameOfOutFile, noOutFiles, method,jackknife);
+  argumentFlags(argc,argv,logscale,useLowMem,interactOn,quiet,interactStr,
+                nameOfOutFile, noOutFiles, method,jackknife, jumpTracer);
 
   if (fixBoundaryOn)
-    cout <<"# Fix boundary"<<endl;
+    cout << "# Fix boundary" << endl;
   else
-    cout <<"# Periodic boundary"<<endl;
+    cout << "# Periodic boundary" << endl;
 
   AskUserForInputParameters(X,Y,Z,N,ensemble,antalPunkter,maxTime);
 
   //Initiate the Lattice class, which is what does all the physics.
-  Lattice crowd1(X,Y,Z,N,fixBoundaryOn);
-  // Lattice crowd2(X,Y,Z,N,fixBoundaryOn);
-  // Lattice crowd3(X,Y,Z,N,fixBoundaryOn);
-  // Lattice crowd4(X,Y,Z,N,fixBoundaryOn);
+  Lattice crowd1(X,Y,Z,N,SEED_LATTICE1,fixBoundaryOn);
+  // Lattice crowd2(X,Y,Z,N,SEED_LATTICE2,fixBoundaryOn);
+  // Lattice crowd3(X,Y,Z,N,SEED_LATTICE3,fixBoundaryOn);
+  // Lattice crowd4(X,Y,Z,N,SEED_LATTICE4,fixBoundaryOn);
 
   //If Brute force, store the "base name" and append number later (see for-loop)
   const std::string baseName = nameOfOutFile;
@@ -123,89 +130,26 @@ int main(int argc, char* argv[]){
       // crowd4.setInteraction(interactStr);
     }
 
-    static Ran randomHopDistribution(SEED_JUMP);   //just anny seed will do
 
+    float jumpCrowders = JUMPRATE_CROWDER;  //k_c (only if Nakazato)
+    vector<Jump> jumpRates;                  //returned by reference
 
-    vector<Jump> hopRate;
+    //store characteristic trait of cosen distribution
+    float info;
 
-    //Characteristic trait of the chosen distribution,
-    //just used to print info to file/screen
-    float info = 0;
+    //generate jumprates for all crowding particles.
+    computeJumpRates(jumpRates, info, N, jumpTracer, jumpCrowders);
 
-    for (int particle = 0; particle < N; particle ++){
-      double u;
-      do {
-        u = randomHopDistribution.doub();
-      }while (u == 0);
+    //Only actually needed for our "computeNakazato"-function.
+    crowd1.setJumpNaka(jumpCrowders, jumpTracer);
+    // crowd2.setJumpNaka(jumpCrowders, jumpTracer);
+    // crowd3.setJumpNaka(jumpCrowders, jumpTracer);
+    // crowd4.setJumpNaka(jumpCrowders, jumpTracer);
 
-      int n = DISTRIBUTION;  //Choose distribution
-
-      float jumpTracer;
-
-      //NOTE: The jumprate is in EACH direction! Meaning, jumprate =1
-      //is actually a jumprate =4 in 2D. (I think)
-      if (0 <= n && n<=3 && (u < 1 && u > 0) ){
-        jumpTracer = JUMPRATE_TRACER;  //Jumprate for the tracer paricle!
-        float lambda = 1.0;            //used in option 1 Exp-dist.
-        float y_c = 1.0;               //used in option 2 Power-law
-        float alpha = 0.5;             //used in option 2 Power-law
-        float jumpCrowders = JUMPRATE_CROWDER; //used in option 3 Nakazato
-        crowd1.setJumpNaka(jumpCrowders, jumpTracer);
-        // crowd2.setJumpNaka(jumpCrowders, jumpTracer);
-        // crowd3.setJumpNaka(jumpCrowders, jumpTracer);
-        // crowd4.setJumpNaka(jumpCrowders, jumpTracer);
-
-        switch(n){
-        case 0:      // 0 = uniform distribution
-          u = u;
-          info = 1.0;               //Maximum value for uniform random number
-          break;
-        case 1:      // 1 = exponential distribution
-          u = (-log(u)) / lambda;
-          u = 1.0/u;
-          info = lambda;
-          break;
-        case 2:      // 2 = power law distribution
-          // p(y) = alpha/y_c * (y/y_c)^{-1-alfa} if y > y_c, || 0
-          u = y_c * pow(u,-1/alpha);
-          u = 1.0/u; //convert friction coefficient to jump rate
-          info = alpha;
-          break;
-        case 3:      // 3 = nakazato distribution
-          if (particle == 0) u = jumpTracer;   //set juprate for the first
-          else u = jumpCrowders;               //set juprate for the rest
-          info = jumpTracer/jumpCrowders;
-          break;
-        }
-      }
-      else{
-        if (n > 3 || n <0 )
-          cout << "Invalid value/choise for prob.distribution ("<< n <<")" << endl;
-        else
-          printError("Random number for jumprate must be 0 < r < 1");
-      }
-
-      //Manually set the jumprate of the tracer particle (first one)
-      if (particle == 0 ) u = jumpTracer;
-
-      //save jump rate u to right and left direction
-      Direction dir(u,u);
-
-      Jump jump;
-
-      //same jumprate in all dimensions (x,y,z)
-      jump.x = dir;
-      jump.y = dir;
-      jump.z = dir;
-
-      hopRate.push_back(jump);
-    }
-
-    crowd1.setJumpRate(hopRate);
-    // crowd2.setJumpRate(hopRate);
-    // crowd3.setJumpRate(hopRate);
-    // crowd4.setJumpRate(hopRate);
-
+    crowd1.setJumpRate(jumpRates);
+    // crowd2.setJumpRate(jumpRates);
+    // crowd3.setJumpRate(jumpRates);
+    // crowd4.setJumpRate(jumpRates);
 
 
     //====================
@@ -309,7 +253,7 @@ int main(int argc, char* argv[]){
           << "\t distr: " << dist[DISTRIBUTION] << " (" << info
           << ")\t bound: " << bound[FIXBOUNDARY] << endl;
     print << "#D_eff: " << d_eff << "\t k_tagg: "                //line3
-          << hopRate[0].x.r << "\t D_av: " << d_av
+          << jumpRates[0].x.r << "\t D_av: " << d_av
           << "\t Interaction: " << onOff[interactOn] << " "
           << interactStr << endl;
 
@@ -386,3 +330,78 @@ int main(int argc, char* argv[]){
 
 */
 
+
+void computeJumpRates(vector<Jump>& hopRate, float& info, const int N,
+                      const float jumpTracer, const float jumpCrowders){
+
+  //we store by hopRate.push_back() further down
+  hopRate.clear();
+
+  static Ran randomHopDistribution(SEED_JUMP);   //just anny seed will do
+
+  //Characteristic trait of the chosen distribution,
+  //just used to print info to file/screen
+  info = 0;
+
+  for (int particle = 0; particle < N; particle ++){
+    double u;
+    do {
+      u = randomHopDistribution.doub();
+    }while (u == 0);
+
+    int n = DISTRIBUTION;  //Choose distribution
+
+    //NOTE: The jumprate is in EACH direction! Meaning, jumprate =1
+    //is actually a jumprate =4 in 2D. (I think)
+    if (0 <= n && n <= 3 && (u < 1 && u > 0) ){
+      float lambda = 1.0;            //used in option 1 Exp-dist.
+      float y_c = 1.0;               //used in option 2 Power-law
+      float alpha = 0.5;             //used in option 2 Power-law
+
+      switch(n){
+      case 0:      // 0 = uniform distribution
+        u = u;
+        info = 1.0;           //Maximum value for uniform random number
+        break;
+      case 1:      // 1 = exponential distribution
+        u = (-log(u)) / lambda;
+        u = 1.0/u;
+        info = lambda;
+        break;
+      case 2:      // 2 = power law distribution
+        // p(y) = alpha/y_c * (y/y_c)^{-1-alfa} if y > y_c, || 0
+        u = y_c * pow(u,-1/alpha);
+        u = 1.0/u; //convert friction coefficient to jump rate
+        info = alpha;
+        break;
+      case 3:      // 3 = nakazato distribution
+        if (particle == 0) u = jumpTracer;   //set juprate for the first
+        else u = jumpCrowders;               //set juprate for the rest
+        info = jumpTracer/jumpCrowders;
+        break;
+      }
+    }
+    else{
+      if (n > 3 || n <0 )
+        cout << "Invalid value/choise for prob.distribution ("<< n <<")"
+             << endl;
+      else
+        printError("Random number for jumprate must be 0 < r < 1");
+    }
+
+    //Manually set the jumprate of the tracer particle (first one)
+    if (particle == 0 ) u = jumpTracer;
+
+    //save jump rate u to right and left direction
+    Direction dir(u,u);
+
+    Jump jump;
+
+    //same jumprate in all dimensions (x,y,z)
+    jump.x = dir;
+    jump.y = dir;
+    jump.z = dir;
+
+    hopRate.push_back(jump);
+  }
+}

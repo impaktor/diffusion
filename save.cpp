@@ -807,7 +807,7 @@ void Save::computeBootstrap(std::string name, int numberOfRuns,
                 <<  "sig_mu: " << sigma_mu_final << std::endl;
 
 
-      //Print bootstrapped mean of mean  to file:
+      //Print bootstrapped mean of mean to file:
       //-----------------------------------------
       ofstream hybridOut;
       std::string nameOfFile = name + "_hybrid";

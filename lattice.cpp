@@ -23,18 +23,14 @@ const bool TEST_1            = 0;
 //CPU consuming, use only when bug-squashing!
 const bool CHECK_VACANCY_ON  = 0;
 
-//My seeds (are usually 87,1,8)
-const float SEED_WAITING_TIME = 87;
-const float SEED_PLACE        = 1;
-const float SEED_MOVE         = 8;
-
-
 // =====================
 // C O N S T R U C T O R
 // =====================
 
 Lattice::Lattice(int xSquare,int ySquare,int zSquare,
-                 int particleNumber, bool boundary){
+                 int particleNumber, double seed, bool boundary)
+  //initiate the random number generator with "seed" just given
+  : randomNumber(seed){
 
   if (xSquare >= ySquare && ySquare  >= zSquare && zSquare >= 1){
     if (particleNumber <= xSquare*ySquare*zSquare){
@@ -106,8 +102,7 @@ void Lattice::place(void){
   leftToPlace--;                  //one less to place
   totalSites--;
 
-  double R;
-  static Ran randomNumber1(SEED_PLACE);   //just any seed will do.
+  double R;                               //store random number here
   int i, j, k, n = 1;                     //First crowder at n = 1 element
   for (k=1; k <= latticeZ_; k++){         //place particles
     for (j=1; j <= latticeY_; j++){
@@ -117,8 +112,8 @@ void Lattice::place(void){
         if (i != pos_0_.x || j != pos_0_.y || k != pos_0_.z){
 
           //using NR to generate 0 < R < 1 ;
-          R = randomNumber1.doub();
-          if (R<=leftToPlace*1.0/totalSites){
+          R = randomNumber.doub();
+          if (R <= leftToPlace*1.0 / totalSites){
             pos_[n].x = i;
             pos_[n].y = j;
             pos_[n].z = k;
@@ -380,17 +375,16 @@ void Lattice::moveOld(){
   //particles, but I keep it for sentimental reasons.
   //Better safe than sorry.
 
-  static Ran randomNumber2(2);    //any seed will do.
   int r,n;
 
   //Choose particle at random, 0 <= n < N
   do{
-    n = randomNumber2.doub() * nParticles_;
+    n = randomNumber.doub() * nParticles_;
   }while(n == nParticles_);
 
 
   do{
-    r = randomNumber2.doub() * (2 * dim_);
+    r = randomNumber.doub() * (2 * dim_);
   }while( r == dim_ * 2 );           //gives 0<=R<2*dim
 
 
@@ -576,15 +570,14 @@ inline double Lattice::computeWaitingTime(void){
   //one time step
   double tau;
 
-  static Ran randomNumb2(SEED_WAITING_TIME);
-  double random;
+  double r;
 
   if(isExponentialWaitingTime_){
     do{
-      random = randomNumb2.doub();
-    }while( random == 1 || random == 0 );
+      r = randomNumber.doub();
+    }while( r == 1 || r == 0 );
 
-    tau = log(1.0 / random) / partialSum_.back();
+    tau = log(1.0 / r) / partialSum_.back();
   }
   else //linear waiting time
     tau = 1.0 / partialSum_.back();
@@ -635,21 +628,20 @@ void Lattice::move(){
     }
     */
 
-    static Ran randomNumb(SEED_MOVE);
-    double r2;
+    double r2;          //store random number here
 
-    int mu_guess;                       // must be integer. (index of vector)
+    int mu_guess;       // must be integer. (index of vector)
     int mu_left = 0;
     int mu_right = dim_ * 2 * nParticles_;
     double p_left = (double) partialSum_.front(); //value in first element (=0)
     double p_right = (double) partialSum_.back(); //value in last element (=dim_*2*N)
 
     do{
-      r2 = randomNumb.doub();
+      r2 = randomNumber.doub();
     }while( r2 == 1 || r2 == 0 );
 
     double p_rand = (double) r2 * partialSum_.back();
-    bool LoopAgain = true;
+    bool loopAgain = true;
 
     //NOTE: when comparing a long double against a double, C++ will fill
     //in the blanks with zeroes. Every 10^15 run of move() will lead to
@@ -666,7 +658,7 @@ void Lattice::move(){
 
       if ((double) partialSum_[mu_guess] <= p_rand && p_rand <
           (double) partialSum_[mu_guess+1])
-        LoopAgain = false;
+        loopAgain = false;
 
       else{
         if (p_rand < (double) partialSum_[mu_guess]){
@@ -678,7 +670,7 @@ void Lattice::move(){
           p_left = partialSum_[mu_guess+1];
         }
       }
-    }while(LoopAgain);
+    }while(loopAgain);
 
     int mu = mu_guess;
     int n,r;
@@ -1078,8 +1070,7 @@ void Lattice::buildCluster2(int n, vector<int>& NearestNeighbours,
                               double Exponent){
   vector<int> unique;
   vector<int> NewParticleAdded;
-  static Ran RandomNUM(42);
-  double randomNumber;
+  double rand;
 
   //Build a vector with particles that form the Cluster:
   //-------------------------------------------------
@@ -1116,8 +1107,8 @@ void Lattice::buildCluster2(int n, vector<int>& NearestNeighbours,
       }
       if(SingleValued){
         //Add the new particle, with Boltzmann's consent...
-        // randomNumber = RandomNUM.doub();
-        //if (randomNumber >=  exp(-1.0*Exponent)){
+        // rand = randomNumber.doub();
+        //if (rand >=  exp(-1.0*Exponent)){
         unique.push_back(NearestNeighbours[j]);
         NewParticleAdded.push_back(NearestNeighbours[j]);
         //New particles added to the cluster, run the loop again

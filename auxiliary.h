@@ -10,7 +10,7 @@
 
 //only these functions needs to be accessible from the "outside",
 void argumentFlags(int, char**, bool&, bool&, bool&, bool&,
-                   int&, std::string&, int&, char&, bool&);
+                   int&, std::string&, int&, char&, bool&, float&);
 
 void AskUserForInputParameters(int&, int&, int&, int&,
                                int&, int&, double&);
