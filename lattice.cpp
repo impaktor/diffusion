@@ -125,9 +125,9 @@ void Lattice::place(void){
 // ---------------------
 
 void Lattice::setSamplingTimes(const vector<double>& samplingTime,
-                               bool isExpWaitingTime = false){
+                               waitingtime tagged_waiting_time = waitingtime::LIN){
 
-  isExponentialWaitingTime_ = isExpWaitingTime;
+  tagged_waiting_time_ = tagged_waiting_time;
 
   noSamplingTimes_ = (int) samplingTime.size();
 
@@ -368,19 +368,30 @@ int Lattice::vacancyCheck(int n, const Particle& oldPos){
 
 double Lattice::computeWaitingTime(void){
 
-  //one time step
-  double tau;
+  //one time step for crowding particle
+  double tau = 0;
 
   double r;
 
-  if(isExponentialWaitingTime_){
+  if(tagged_waiting_time_ == waitingtime::EXP){
     do{
       r = randomNumber.doub();
     }while( r == 1 || r == 0 );
 
     tau = log(1.0 / r) / partialSum_.back();
   }
-  else //linear waiting time
+  else if(tagged_waiting_time_ == waitingtime::POW){
+
+    do{
+      r = randomNumber.doub();
+    }while( r == 1 || r == 0 );
+
+    // if 0 < alpha < 2: second mom inf. if alpha < 1, first mom inf.
+    const double alpha = 0.5;
+    const double a = 1;
+    tau = a * std::pow(r, -1.0/alpha);
+  }
+  else if(tagged_waiting_time_ == waitingtime::LIN)
     tau = 1.0 / partialSum_.back();
 
   return tau;

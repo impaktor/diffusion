@@ -3,6 +3,12 @@
 
 #include <time.h>
 
+enum waitingtime {
+  LIN = 0,
+  EXP = 1,
+  POW = 2,
+};
+
 //First three classes (Direction, Jump, Particle), will allow us to
 //get the position of a Particle object as: object.x, and the jump
 //rate as object.rate.x.r etc.

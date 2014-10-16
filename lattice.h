@@ -188,7 +188,7 @@ public:
   int getDimension(void) const;
   void getDisplacement(vector<int>&, vector<int>&,
                        vector<int>&, vector<double>&) const;
-  void setSamplingTimes(const vector<double>&, bool);
+  void setSamplingTimes(const vector<double>&, waitingtime);
   void setInteraction(float);             //determine if we use the interaction-algorithm
   void setJumpNaka(float, float);
   void setDist(int, double);
@@ -240,12 +240,12 @@ protected:
   int vacancyCheck(int, const Particle&);
 
   float jumpCrowders_, jumpTracer_;        //only used in the Nakazato()-function
-  bool isTestOn_;                         //To print detailed information to screen
+  bool isTestOn_;                          //To print detailed information to screen
 
   int round(float x) {                     //Round off (used to get center of lattice)
     return int(x + 0.5);  }
 
-  bool isExponentialWaitingTime_;
+  waitingtime tagged_waiting_time_;        // waiting time (lin,exp,pow) of the tagged particle
   double computeWaitingTime(void);
 
 private:                                    //not shared with suerInteraction

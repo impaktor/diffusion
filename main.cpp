@@ -24,6 +24,18 @@
 
 void computeJumpRates(std::vector<Jump>&, float&, int, float, float, float, int);
 
+const std::string getWaitTime(enum waitingtime wt)
+{
+   switch (wt)
+   {
+      case LIN: return "lin";
+      case EXP: return "exp";
+      case POW: return "pow";
+   }
+   return "Error";
+}
+
+
 
 int main(int argc, char* argv[]){
 
@@ -73,8 +85,8 @@ int main(int argc, char* argv[]){
   tmpValue = ini.GetValue("time", "t_stop", NULL);
   double maxTime = atof(tmpValue);
 
-  tmpValue = ini.GetValue("time", "exponential_waiting", NULL);
-  bool expWaitingTime = aux::convertToBool(tmpValue, "exponential_waiting");
+  tmpValue = ini.GetValue("time", "waiting", NULL);
+  waitingtime waitingTime = static_cast<waitingtime>(atoi(tmpValue));
 
   tmpValue = ini.GetValue("time", "N", NULL);
   int nSamplings = atoi(tmpValue);
@@ -182,7 +194,7 @@ int main(int argc, char* argv[]){
         //Initiate the Lattice class, which is what does all the physics.
 
         Lattice tmp(X, Y, Z, nParticles, seed * (i+1), isBoundaryFix);
-        tmp.setSamplingTimes(samplingTimes, expWaitingTime);
+        tmp.setSamplingTimes(samplingTimes, waitingTime);
 
         //Only actually needed for our "computeNakazato"-function.
         tmp.setJumpNaka(jumprateCrowders, jumprateTracer);
@@ -227,7 +239,6 @@ int main(int argc, char* argv[]){
     std::string dist[]     = {"uniform","exponential","powerlaw","nakazato"};
     std::string onOff[]    = {"Off","On"};
     std::string bound[]    = {"periodic","fix"};
-    std::string waitTime[] = {"lin","exp"};
     float d_eff = lattices[0].computeEffectiveDiffusionConst();
     float d_av = lattices[0].computeAverageDiffusionConst();
 
@@ -236,7 +247,7 @@ int main(int argc, char* argv[]){
     print << "#E = " << ensembles <<"\t N = " << nParticles << "\t X-Y-Z: " //line1
           << X << "x" << Y << "x" << Z << "\t 2*d*D_naka: "
           << lattices[0].computeNakazato() << "  Waiting time: "
-          << waitTime[expWaitingTime] << std::endl;
+          << getWaitTime(waitingTime) << std::endl;
     print << "#Conc.: "<< (float) nParticles/(X*Y*Z) << "\t MSD_equil: "  //line2
           << lattices[0].computeErgodicity(X,Y,Z)
           << "\t distr: " << dist[jumprateDistribution] << " (" << info

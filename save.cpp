@@ -189,6 +189,7 @@ void Save::computeZ(std::string filename){
   // computeHmatrix2(H, true);
   // printHmatrix(H, filename + "_matrix2");
 
+  //TODO: don't use if POW waiting time / CTRW
   computeHmatrix(store_dr2_, H);
   printHmatrix(H, filename + "_matrix1");
 
