@@ -128,6 +128,42 @@
   stuff with them. Understanding the definitions in classes.{h,cpp} is
   crucial.
 
+** Coding Conventions
+   The code follows the following rules:
+   (see [[http://geosoft.no/development/cppstyle.html]])
+
+   | DESCRIPTION                | EXAMPLE                     |
+   |----------------------------+-----------------------------|
+   | All variables              | =camelCase=, =myVariable=   |
+   | Constants                  | =MY_CONSTANT=               |
+   | Private class variables    | =camelCase_=                |
+   |                            |                             |
+   | Types                      | CamelCase, MyType, Particle |
+   | (always a noun, or is it?) | Direction, etc.             |
+   |                            |                             |
+   | Functions & methods:       | getVariable(), computeD(),  |
+   | (always a verb, ...is it?) | setVariable()               |
+
+   - operators are preceded and followed by space, " == ", " + " etc.
+
+   - /Generic variables should have the same name as their type/
+
+   - Note: underscore =_= can be used in the standard LaTeX-sense: =pos_0= etc.
+
+   - use =int&= rather than =int &=
+
+** Dimension
+   The program accurately accounts for all dimensions larger
+   than 1. This means that a lattice with size 100x100x0 or 100x100x1
+   is considered two dimensional lattice, and only moves in X and Y are
+   made. All particles still have a Z-coordinate, but no move will be
+   made in this direction as long as Z<2, or else we would "leak" some
+   probability/speed of the particles.
+
+** Jump-rates
+   The code allows for different jump rates in different directions,
+   although this has never been used.
+
 * Running on many computers
   use ssh:
 :  $ ssh -n 'cd /to/path; nice -19 ./prog -r input.ini'
@@ -190,18 +226,6 @@
   Generally, hard-coded variables are defined in the head of
   =save.cpp=, and =lattice.cpp=.
 
-* Dimension
-  The program accurately accounts for all dimensions larger
-  than 1. This means that a lattice with size 100x100x0 or 100x100x1
-  is considered two dimensional lattice, and only moves in X and Y are
-  made. All particles still have a Z-coordinate, but no move will be
-  made in this direction as long as Z<2, or else we would "leak" some
-  probability/speed of the particles.
-
-* Jump-rates
-  The code allows for different jump rates in different directions,
-  although this has never been used.
-
 * Super-Interaction code                                           :noexport:
   If running =./super -i N=, it will run the super interaction code
   that builds clusters and allows them to collide with each
@@ -217,30 +241,6 @@
   original cluster, are included) and move the old and new or do stay
   (i.e. reject attempt to move) depending on the friction (sum of jump
   rates) of the clusters.
-
-* Coding Conventions
-  The code follows the following rules:
-  (see [[http://geosoft.no/development/cppstyle.html]])
-
-| DESCRIPTION                | EXAMPLE                     |
-|----------------------------+-----------------------------|
-| All variables              | =camelCase=, =myVariable=   |
-| Constants                  | =MY_CONSTANT=               |
-| Private class variables    | =camelCase_=                |
-|                            |                             |
-| Types                      | CamelCase, MyType, Particle |
-| (always a noun, or is it?) | Direction, etc.             |
-|                            |                             |
-| Functions & methods:       | getVariable(), computeD(),  |
-| (always a verb, ...is it?) | setVariable()               |
-
-  - operators are preceded and followed by space, " == ", " + " etc.
-
-  - /Generic variables should have the same name as their type/
-
-  - Note: underscore =_= can be used in the standard LaTeX-sense: =pos_0= etc.
-
-  - use =int&= rather than =int &=
 
 * Additional speed
   When running huge simulations one could try commenting some of the
@@ -278,7 +278,6 @@
    to disable the OpenMP instructions.
 
 * CHANGE LOG
-  ---------
 
 ** version 13 BETA [2013-04-27]
 
@@ -290,7 +289,6 @@
 
 - removed askUserForInputParameters, readInputFile, isComment from
   auxiliary.{cpp,h}. Created an aux::namespace.
-
 
 ** version 12 [2013-04-27]
 
