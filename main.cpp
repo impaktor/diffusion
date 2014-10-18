@@ -259,8 +259,12 @@ int main(int argc, char* argv[]){
 
     std::string head = print.str();
 
-    //calculate standard deviation, error-bars, and save to file
-    save.save(def.outputFileName, head);
+    if(def.method != 'd')
+      //calculate standard deviation, error-bars, and save to file
+      save.save(def.outputFileName, head);
+    else
+      // dump raw trajectories (non-mean) to file. Do rest in script.
+      save.dump(def.outputFileName, head);
 
     //prints distribution, and saves to "outputFileName" + "_histogram"
     if(printHistogram)

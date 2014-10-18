@@ -305,6 +305,30 @@ void Save::save(std::string name, std::string head){
   }
 }
 
+// dump raw trajectories squared to file (with baseName)
+void Save::dump(std::string baseName, std::string head){
+  if(isLowMem_){
+    // Not implemented, but then I should print each dr passed into
+    // Save::store(..dr..) as it is called, but then Save class needs
+    // to know if I'm running in "dumped" mode.
+    assert(false);
+  }
+  else{
+
+    for(size_t i = 0; i < store_dr2_.size(); i++){
+		std::ostringstream fileName;
+		fileName << baseName << "_" << i;
+      std::ofstream file(fileName.str().c_str());
+      file << head;
+      file << "# t \t r^2 " << std::endl;
+
+      for(int j = 0; j < noSamplingTimes_; j++)
+        file << samplingTime_[j] << "\t" << store_dr2_[i][j] << std::endl;
+      file.close();
+      std::cout << "finished file:\t" << fileName.str() << std::endl;
+    }
+  }
+}
 
 void Save::printSlopeJackknifeShrinkage(std::string filename, int jackgroups){
   //To run with Pigeon's data, from read_data.cpp which removes the

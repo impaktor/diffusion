@@ -30,6 +30,9 @@ public:
   //plus "head" which is just information about simulation parameters.
   void save(std::string fileName, std::string head);
 
+  // dump raw trajectories squared to files, set by output -w
+  void dump(std::string fileName, std::string head);
+
   //To get P(x,t) i.e. a histogram, printed to file: "fileName_histogram"
   //i.e. it appends "_histogram" to the given output file name.
   void computeDistribution(std::string fileName, int noBins);

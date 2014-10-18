@@ -21,7 +21,7 @@ void aux::argumentFlags(int argc, char** argv, InputValues &in){
   int c;
   opterr = 0;
 
-  while((c = getopt(argc,argv,"hmw:r:i:jB:b:k:t:")) != -1)
+  while((c = getopt(argc,argv,"hmdw:r:i:jB:b:k:t:")) != -1)
     switch (c){
     case 'm':
       in.isLowMem = std::make_pair(true, true);
@@ -60,6 +60,9 @@ void aux::argumentFlags(int argc, char** argv, InputValues &in){
       in.method = 'B';
       in.nOutputs = atoi(optarg);
       ++usingMultipleOutputs;
+      break;
+    case 'd':
+      in.method = 'd';
       break;
     case 't':
       in.jmpTracer = std::make_pair(atof(optarg), true);
