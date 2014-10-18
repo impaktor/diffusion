@@ -109,6 +109,8 @@
 
   * -t k :: Set the tracer jumprate to "k", where "k" is a float.
 
+  * -d :: dump all raw squared trajectories (r**2) to destination set by -w flag.
+
 * Output-files
   The primary output-file, (default name is out.dat) has the following
   columns (as of 2012-11):
@@ -279,7 +281,13 @@
 
 * CHANGE LOG
 
+  Starting from now [2014-10-18 lör], commit:
+  0992ab0175c3ea2191efc91a209c7e64e1382a1e, , I will not update this
+  Change-log section anymore. It's in the git history.
+
 ** version 13 BETA [2013-04-27]
+- added d-flag for dumping raw data (trajectories squared) to folder.
+  [2014-10-18 lör]
 
 - removed the -l flag for log-spacing.
 
