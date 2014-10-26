@@ -135,15 +135,17 @@ void Lattice::setSamplingTimes(const vector<double>& samplingTime,
     aux::printError("No sampling times set!");
 
   //check that it is monotonously increasing:
-  bool isOrdered = false;
-  for (int i = 1; i < noSamplingTimes_; i++){
-    if (samplingTime[i-1] < samplingTime[i])
-      isOrdered = true;
-  }
+  bool isOrdered = true;
 
   if (samplingTime[0] < 0)
     isOrdered = false;
 
+  for (int i = 1; i < noSamplingTimes_; i++){
+    if (samplingTime[i-1] > samplingTime[i]){
+      isOrdered = false;
+      break;
+    }
+  }
 
   if (isOrdered){
     samplingTime_ = samplingTime;
