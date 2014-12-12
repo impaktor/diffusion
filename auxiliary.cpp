@@ -142,6 +142,7 @@ void aux::printHelp(char** argv){
   std::cout << "-b N\t Generate the N number of outfiles (NAME0, NAME1,...) using bootstrap." << std::endl;
   std::cout << "-B N\t Generate the N number of outfiles (NAME0, NAME1,...) using Bruteforce." << std::endl;
   std::cout << "-t K\t Set tracer jumprate to K." << std::endl;
+  std::cout << "-d\t Dump all raw trajectories to path specified by -w. No post processing." << std::endl;
 
   std::cout << std::endl << "Arguments can be given in any order, and can be grouped (like \"-li 4\"). If no flags are set the first argument following \"" <<argv[0]<<"\" will be taken as the output-file name.\n Note, with '-i 0' the interaction strength will be 0, but the interaction code will be turned ON, resulting in a slower simulation run, therefore the default circumvents the interaction calculations entirely."<<std::endl<<std::endl;
 
