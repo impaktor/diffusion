@@ -392,6 +392,7 @@ double Lattice::computeWaitingTime(void){
     const double alpha = 0.5;
     const double a = 1;
     tau = a * std::pow(r, -1.0/alpha);
+    //tau = a * (std::pow(r, -1.0/alpha) - 1.0); // correct version, but identical to above
   }
   else if(tagged_waiting_time_ == waitingtime::LIN)
     tau = 1.0 / partialSum_.back();
