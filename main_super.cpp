@@ -108,7 +108,6 @@ int main(int argc, char* argv[]){
               << " not identical jumprates! \a\n" << std::endl;
   }
 
-
   //Construct vector of sampling times
   std::vector<double> samplingTimes;
   if(!isLogScale){
@@ -129,28 +128,6 @@ int main(int argc, char* argv[]){
       samplingTimes.push_back( exp(logTimeSum) );
     }
   }
-
-
-  //If Brute force, store the "base name" and append number later (see for-loop)
-  const std::string baseName = def.outputFileName;
-
-  bool loopAgain = true;
-  //for-loop to produce many output-files, but only if Brute force.
-  for(int W = 0; W < def.nOutputs && loopAgain; W++){
-    if(def.method == 'b')    //if bootstrap, we'll generate the noOutFiles
-      loopAgain = false; //after the first loop run, so only loop once.
-
-    //If we rerun the simulation many times, we must change the output file
-    //name by appending numbers to them.
-    if(def.nOutputs > 1 && def.method == 'B'){
-      std::cout << "\nOutput-file number: " << W + 1 << " of "
-                << def.nOutputs << std::endl;
-
-      //change name of outfile to baseNameW, like: out.dat[number]
-      std::stringstream temp;
-      temp << baseName << W;
-      def.outputFileName = temp.str();
-    }
 
     std::vector<Jump> jumpRates;                  //returned by reference
 
@@ -272,8 +249,6 @@ int main(int argc, char* argv[]){
 
     if(def.isJackknife)
       save.computeJackknife(def.outputFileName);
-
-  }  //END: of loop for re-running the simulation
 
   return 0;
 }

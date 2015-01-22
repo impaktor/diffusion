@@ -15,13 +15,10 @@ void aux::argumentFlags(int argc, char** argv, InputValues &in){
 
   bool error = false;
 
-  //make sure we only set -b or -B, not both!
-  int usingMultipleOutputs = 0;
-
   int c;
   opterr = 0;
 
-  while((c = getopt(argc,argv,"hmdw:r:i:jB:b:k:t:")) != -1)
+  while((c = getopt(argc,argv,"hmdw:r:i:jBb:k:t:")) != -1)
     switch (c){
     case 'm':
       in.isLowMem = std::make_pair(true, true);
@@ -54,12 +51,9 @@ void aux::argumentFlags(int argc, char** argv, InputValues &in){
     case 'b':
       in.method = 'b';
       in.nOutputs = atoi(optarg);
-      ++usingMultipleOutputs;
       break;
     case 'B':
-      in.method = 'B';
-      in.nOutputs = atoi(optarg);
-      ++usingMultipleOutputs;
+      in.isBruteForce = true;
       break;
     case 'd':
       in.method = 'd';
@@ -69,11 +63,9 @@ void aux::argumentFlags(int argc, char** argv, InputValues &in){
       break;
     case '?':
       error = true;
-      if(optopt =='w' || optopt =='i' || optopt =='B' || optopt =='b'
-         || optopt =='t' || optopt == 'k')
+      if(optopt =='w' || optopt =='i' || optopt =='b' || optopt =='t' || optopt == 'k')
         //fprintf(stderr, "Option -%c requires an argument. \n",optopt);
-        std::cout << "Option -" << (char) optopt << " requires an argument"
-                  << std::endl;
+        std::cout << "Option -" << (char) optopt << " requires an argument" << std::endl;
       else if(isprint(optopt))
         //fprintf(stderr,"Unknown option '-%c'. \n",optopt);
         std::cout << "unknown option: -"<< (char) optopt << std::endl;
@@ -86,15 +78,6 @@ void aux::argumentFlags(int argc, char** argv, InputValues &in){
       std::cout << "Non-critical error in pogram (bad programming)"<< std::endl;
       abort();
     }
-
-  if (usingMultipleOutputs > 1){
-    std::cout << "  Correct use is: " << argv[0] << " -[b/B] N" << std::endl
-              << "  where N = number of simulation re-runs "<< std::endl
-              << "  ie. number of output-files, and [b/B] is either:\n"
-              << "    -b   bootstrap (fast)" << std::endl
-              << "    -B   Brute force (roughly N times slower)" << std::endl;
-    error = true;
-  }
 
   //print error message if we entered case '?' above
   if(error){
@@ -140,7 +123,7 @@ void aux::printHelp(char** argv){
   std::cout << "-k N\t Turn on the bootknife algorithm with N reshuffled MSD's." << std::endl;
   std::cout << "\t Can not be used with the -m flag." << std::endl;
   std::cout << "-b N\t Generate the N number of outfiles (NAME0, NAME1,...) using bootstrap." << std::endl;
-  std::cout << "-B N\t Generate the N number of outfiles (NAME0, NAME1,...) using Bruteforce." << std::endl;
+  std::cout << "-B\t Bruteforce: each point uncorrelated" << std::endl;
   std::cout << "-t K\t Set tracer jumprate to K." << std::endl;
   std::cout << "-d\t Dump all raw trajectories to path specified by -w. No post processing." << std::endl;
 
@@ -152,11 +135,6 @@ void aux::printHelp(char** argv){
             << "\t" << argv[0] <<" -w 5.5/uniform04.dat" << std::endl
             << "Puts the output in the folder \"5.5\" with the name \"uniform04.dat\"."
             << std::endl;
-
-  std::cout << "\t" << argv[0] << " -B 1000 -w brute.dat" << std::endl
-            << "Use brute force, save to brute.dat0 ... brute.dat999.\n";
-  std::cout << std::endl;
-
   exit(0);
 }
 

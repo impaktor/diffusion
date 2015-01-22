@@ -26,16 +26,15 @@ public:
   std::string outputFileName;   //save simulation output to files with this prefix
   std::string inputFileName;    //file (path) to read i input values from
 
-  //number of output files/MSD-trajectories.
-  //Only valid for "bootstrap" or "Brute force"
+  //number of output files/MSD-trajectories, only valid for "bootstrap"
   int nOutputs;
 
   bool isJackknife;   //use jackknife method?
-  char method;        //use Bootstrap of Bruteforce?
+  bool isBruteForce;  //use brute force, i.e. only use one point/trajectory
+  char method;        //use Bootstrap ?
   bool isBootknife;   //use Bootknife method?
 
-  //number of trajectories to generate when/if bootknifing. Cant use
-  //the "nOutputs"-variable, since that's for bootstrap and bruteforce
+  //number of trajectories to generate when/if bootknifing.
   size_t nBootknife;
 
   //jumprate of tracer particle
@@ -48,10 +47,11 @@ public:
     outputFileName =      "out.dat";
     inputFileName =       "input.ini";
     nOutputs =            1;
-    method =              'B';
+    method =              'b';
     isBootknife =         false;
     nBootknife =          1;    //what is this? XXX TODO
     isJackknife =         false;
+    isBruteForce =        false;
     jmpTracer =           std::make_pair(1.0, false);
   }
 };

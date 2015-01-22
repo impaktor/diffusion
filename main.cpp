@@ -6,6 +6,7 @@
 #include <omp.h>
 //#include <thread>      //new C++ standard! same as old boost_threads
 #include <map>
+#include <cassert>
 
 #include <sstream>     //for [o]stringstream
 
@@ -119,7 +120,6 @@ int main(int argc, char* argv[]){
               << " not identical jumprates! \a\n" << std::endl;
   }
 
-
   //Construct vector of sampling times
   std::vector<double> samplingTimes;
   if(!isLogScale){
@@ -141,92 +141,89 @@ int main(int argc, char* argv[]){
     }
   }
 
+  std::vector<Jump> jumpRates;            //returned by reference
+  float info;                             //store trait of chosen distribution
+  RemainingTime printToScreen(ensembles); //non-important nice-to-have simulation info
 
-  //If Brute force, store the "base name" and append number later (see for-loop)
-  const std::string baseName = def.outputFileName;
+  //generate jumprates for all crowding particles
+  computeJumpRates(jumpRates, info, nParticles, jumprateTracer,
+                   jumprateCrowders, seedJump, jumprateDistribution);
 
-  bool loopAgain = true;
-  //for-loop to produce many output-files, but only if Brute force.
-  for(int W = 0; W < def.nOutputs && loopAgain; W++){
-    if(def.method == 'b')    //if bootstrap, we'll generate the noOutFiles
-      loopAgain = false; //after the first loop run, so only loop once.
+  //initiate the save-class to store, save, and print result
+  //(also computes standard error and correlation estimate)
+  Save save(samplingTimes, ensembles, def.isLowMem.first);
 
-    //If we rerun the simulation many times, we must change the output file
-    //name by appending numbers to them.
-    if(def.nOutputs > 1 && def.method == 'B'){
-      std::cout << "\nOutput-file number: " << W + 1 << " of "
-                << def.nOutputs << std::endl;
+  std::vector<Lattice> lattices;   //possibility to store many lattice obj.
+  int noLattice = 1;               //default to one Lattice object...
+  int lattice_index = 0;           //... stored in first element of vector
+# pragma omp parallel shared(save,lattices,noLattice) private(lattice_index)
+  {
+#   ifdef _OPENMP                       //If compiling with OpenMP...
+    noLattice = omp_get_num_threads();  //change to threads" number of lattices.
+#   endif
 
-      //change name of outfile to baseNameW, like: out.dat[number]
-      std::stringstream temp;
-      temp << baseName << W;
-      def.outputFileName = temp.str();
+#   pragma omp single                   //only do this once in total.
+    for(int i = 0; i < noLattice; ++i){ //Initiate the Lattice, (does all the physics)
+
+      Lattice tmp(X, Y, Z, nParticles, seed * (i+1), isBoundaryFix);
+      tmp.setSamplingTimes(samplingTimes, waitingTime);
+
+      //Only actually needed for our "computeNakazato"-function.
+      tmp.setJumpNaka(jumprateCrowders, jumprateTracer);
+      tmp.setJumpRate(jumpRates);
+
+      //if use Interaction algorithm, with InteractStr
+      if(def.isInteracting)
+        tmp.setInteraction(def.interactionStrength);
+
+      lattices.push_back(tmp);
     }
 
-    std::vector<Jump> jumpRates;                  //returned by reference
+#   ifdef _OPENMP                         //if compiling with OpenMP:
+    lattice_index = omp_get_thread_num(); //each thread operates on its own
+#   endif                                 //lattice index in lattices-vector
 
-    //store characteristic trait of chosen distribution
-    float info;
+#  pragma omp for
+    for(int E = 0; E < ensembles; ++E){
+      if(lattice_index == 0)              //only first thread prints progress
+        printToScreen.printProgress(E*noLattice);
 
-    //generate jumprates for all crowding particles.
-    computeJumpRates(jumpRates, info, nParticles, jumprateTracer,
-                     jumprateCrowders, seedJump, jumprateDistribution);
-
-
-    //initiate the save-class to store, save, and print result
-    //(also computes standard error and correlation estimate)
-    Save save(samplingTimes, ensembles, def.isLowMem.first);
-
-    //non-important nice-to-have simulation info.
-    RemainingTime printToScreen(ensembles);
-
-    std::vector<Lattice> lattices;   //possibility to store many lattice obj.
-    int noLattice = 1;               //default to one Lattice object...
-    int lattice_index = 0;           //... stored in first element of vector
-#   pragma omp parallel shared(save,lattices,noLattice) private(lattice_index)
-    {
-#     ifdef _OPENMP                      //If compiling with OpenMP...
-      noLattice = omp_get_num_threads(); //change to threads" number of lattices.
-#     endif
-
-#     pragma omp single                  //only do this once in total.
-      for(int i = 0; i < noLattice; ++i){
-        //Initiate the Lattice class, which is what does all the physics.
-
-        Lattice tmp(X, Y, Z, nParticles, seed * (i+1), isBoundaryFix);
-        tmp.setSamplingTimes(samplingTimes, waitingTime);
-
-        //Only actually needed for our "computeNakazato"-function.
-        tmp.setJumpNaka(jumprateCrowders, jumprateTracer);
-        tmp.setJumpRate(jumpRates);
-
-        //if use Interaction algorithm, with InteractStr
-        if(def.isInteracting)
-          tmp.setInteraction(def.interactionStrength);
-
-        lattices.push_back(tmp);
-      }
-
-#     ifdef _OPENMP                         //if compiling with OpenMP:
-      lattice_index = omp_get_thread_num(); //each thread operates on its own
-#     endif                                 //lattice index in lattices-vector
-
-#    pragma omp for
-      for(int E = 0; E < ensembles; ++E){
-       if(lattice_index == 0)               //only first thread prints progress
-         printToScreen.printProgress(E*noLattice);
-
-       lattices[lattice_index].place();
-       lattices[lattice_index].move();
-
-      //Store tracer position at each point for this "ensembles", needed by
-      //class to compute standard error/deviation. (+for binning, etc.)
-      //extract displacement coordinates of the tracer...
-      //store the current ensemble values in these:
+      //Store tracer position at each point for this "ensembles", to
+      //compute standard error/deviation, etc.
       std::vector<int> dx,dy,dz;
       std::vector<double> dr;
 
-      lattices[lattice_index].getDisplacement(dx,dy,dz,dr);
+      if (def.isBruteForce){              //only use one data point from each trajectory
+
+        dx.reserve(samplingTimes.size()); //make room, for speed
+        dy.reserve(samplingTimes.size());
+        dz.reserve(samplingTimes.size());
+        dr.reserve(samplingTimes.size());
+        assert(dx.size() == 0);           //since using push back in for loop
+
+        for(size_t k = 0; k < samplingTimes.size(); ++k) {
+
+          std::vector<double>::iterator it_begin = samplingTimes.begin();
+          lattices[lattice_index].setSamplingTimes(std::vector<double>(it_begin, it_begin + k+1), waitingTime);
+
+          lattices[lattice_index].place();
+          lattices[lattice_index].move();
+
+          std::vector<int> dx_sub,dy_sub,dz_sub; //save subset of x, y, z, data
+          std::vector<double> dr_sub;
+          lattices[lattice_index].getDisplacement(dx_sub, dy_sub, dz_sub, dr_sub);
+
+          dx.push_back(dx_sub.back());           //only store/use last element
+          dy.push_back(dy_sub.back());
+          dz.push_back(dz_sub.back());
+          dr.push_back(dr_sub.back());
+        }
+      }
+      else{
+        lattices[lattice_index].place();
+        lattices[lattice_index].move();
+        lattices[lattice_index].getDisplacement(dx, dy, dz, dr);
+      }
 
 #     pragma omp critical  //only one thread may write at a time:
       {
@@ -235,71 +232,68 @@ int main(int argc, char* argv[]){
     }
   }
 
-    //To print which distribution we used to head of output-file
-    std::string dist[]     = {"uniform","exponential","powerlaw","nakazato"};
-    std::string onOff[]    = {"Off","On"};
-    std::string bound[]    = {"periodic","fix"};
-    float d_eff = lattices[0].computeEffectiveDiffusionConst();
-    float d_av = lattices[0].computeAverageDiffusionConst();
+  //To print which distribution we used to head of output-file
+  std::string dist[]     = {"uniform","exponential","powerlaw","nakazato"};
+  std::string onOff[]    = {"Off","On"};
+  std::string bound[]    = {"periodic","fix"};
+  float d_eff = lattices[0].computeEffectiveDiffusionConst();
+  float d_av = lattices[0].computeAverageDiffusionConst();
 
-    //print three lines of info about simulation to head of each outfile:
-    std::ostringstream print;
-    print << "#E = " << ensembles <<"\t N = " << nParticles << "\t X-Y-Z: " //line1
-          << X << "x" << Y << "x" << Z << "\t 2*d*D_naka: "
-          << lattices[0].computeNakazato() << "  Waiting time: "
-          << getWaitTime(waitingTime) << std::endl;
-    print << "#Conc.: "<< (float) nParticles/(X*Y*Z) << "\t MSD_equil: "  //line2
-          << lattices[0].computeErgodicity(X,Y,Z)
-          << "\t distr: " << dist[jumprateDistribution] << " (" << info
-          << ")\t bound: " << bound[isBoundaryFix] << std::endl;
-    print << "#D_eff: " << d_eff << "\t k_tagg: "                //line3
-          << jumpRates[0].x.r << "\t D_av: " << d_av
-          << "\t Interaction: " << onOff[def.isInteracting] << " "
-          << def.interactionStrength << std::endl;
+  //print three lines of info about simulation to head of each outfile:
+  std::ostringstream print;
+  print << "#E = " << ensembles <<"\t N = " << nParticles << "\t X-Y-Z: " //line1
+        << X << "x" << Y << "x" << Z << "\t 2*d*D_naka: "
+        << lattices[0].computeNakazato() << "  Waiting time: "
+        << getWaitTime(waitingTime) << std::endl;
+  print << "#Conc.: "<< (float) nParticles/(X*Y*Z) << "\t MSD_equil: "  //line2
+        << lattices[0].computeErgodicity(X,Y,Z)
+        << "\t distr: " << dist[jumprateDistribution] << " (" << info
+        << ")\t bound: " << bound[isBoundaryFix] << std::endl;
+  print << "#D_eff: " << d_eff << "\t k_tagg: "                //line3
+        << jumpRates[0].x.r << "\t D_av: " << d_av
+        << "\t Interaction: " << onOff[def.isInteracting] << " "
+        << def.interactionStrength << std::endl;
 
-    std::string head = print.str();
+  std::string head = print.str();
 
-    if(def.method != 'd')
-      //calculate standard deviation, error-bars, and save to file
-      save.save(def.outputFileName, head);
-    else
-      // dump raw trajectories (non-mean) to file. Do rest in script.
-      save.dump(def.outputFileName, head);
+  if(def.method != 'd')
+    //calculate standard deviation, error-bars, and save to file
+    save.save(def.outputFileName, head);
+  else
+    // dump raw trajectories (non-mean) to file. Do rest in script.
+    save.dump(def.outputFileName, head);
 
-    //prints distribution, and saves to "outputFileName" + "_histogram"
-    if(printHistogram)
-      save.computeDistribution(def.outputFileName, noHistogramBins);
+  //prints distribution, and saves to "outputFileName" + "_histogram"
+  if(printHistogram)
+    save.computeDistribution(def.outputFileName, noHistogramBins);
 
-    if(def.method == 'b')
-      //bootstrap the shit out of this. Note, the bootstrapped output
-      //files can be distinguished from the "real" simulation by them
-      //ending with a number i: {0 < i < (noOutFiles - 1)}
-      save.computeBootstrap(def.outputFileName, def.nOutputs,
-                            jumpRates[0].x.r, head);
+  if(def.method == 'b')
+    //bootstrap the shit out of this. Note, the bootstrapped output
+    //files can be distinguished from the "real" simulation by them
+    //ending with a number i: {0 < i < (noOutFiles - 1)}
+    save.computeBootstrap(def.outputFileName, def.nOutputs,
+                          jumpRates[0].x.r, head);
 
-    if(def.isBootknife)
-      //If true, use the hybrid "bootknife" method to compute slope,
-      //and error, and write to separate file: "out.dat_bootknife"
-      save.computeBootknife(def.outputFileName, def.nBootknife,
-                            jumpRates[0].x.r);
+  if(def.isBootknife)
+    //If true, use the hybrid "bootknife" method to compute slope,
+    //and error, and write to separate file: "out.dat_bootknife"
+    save.computeBootknife(def.outputFileName, def.nBootknife,
+                          jumpRates[0].x.r);
 
-    if(def.isJackknife)
-      save.computeJackknife(def.outputFileName);
-
-
-    // if(def.isShrinkage){
-    //   //print H-matrix with shrinkage applied to it
-    //   save.printShrinkage();
-    // }
+  if(def.isJackknife)
+    save.computeJackknife(def.outputFileName);
 
 
-    // not implemented yet, XXX
-    // if(def.isInvestigateConvergeance){
-    //   save.investigateMuConvergeance();
-    // }
+  // if(def.isShrinkage){
+  //   //print H-matrix with shrinkage applied to it
+  //   save.printShrinkage();
+  // }
 
 
-  }  //END: of loop for re-running the simulation
+  // not implemented yet, XXX
+  // if(def.isInvestigateConvergeance){
+  //   save.investigateMuConvergeance();
+  // }
 
   return 0;
 }

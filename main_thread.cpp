@@ -68,11 +68,11 @@ int main(int argc, char* argv[]){
   // file (path) to read i input values from
   def.inputFileName = "";
 
-  //number of outputfiles/MSD-trajectories, if bootstrapping or brute force.
+  //number of outputfiles/MSD-trajectories, if bootstrapping
   def.nOutputs = 1;
 
-  //is a char, use Bootstrap ('b') of Bruteforce ('B')?
-  def.method = 'B';
+  //is a char, use Bootstrap ('b')
+  def.method = 'b';
 
   //use Bootknife method?
   def.isBootknife = false;
@@ -152,29 +152,6 @@ int main(int argc, char* argv[]){
     crowd3.setInteraction(def.interactionStrength);
     crowd4.setInteraction(def.interactionStrength);
   }
-
-
-  //If Brute force, store the "base name" and append number later (see for-loop)
-  const std::string baseName = def.outputFileName;
-
-  bool loopAgain = true;
-  //for-loop to produce many output-files, but only if Brute force.
-  for(int W = 0; W < def.nOutputs && loopAgain; W++){
-    if(def.method == 'b')    //if bootstrap, we'll generate the noOutFiles
-      loopAgain = false; //after the first loop run, so only loop once.
-
-    //If we rerun the simulation many times, we must change the output file
-    //name by appending numbers to them.
-    if(def.nOutputs > 1 && def.method == 'B'){
-      cout << endl << "Output-file number: " << W + 1 << " of "
-           << def.nOutputs << endl;
-
-      //change name of outfile to baseNameW, like: out.dat[number]
-      stringstream temp;
-      temp << baseName << W;
-      def.outputFileName = temp.str();
-    }
-
 
     float jumpCrowders = JUMPRATE_CROWDER;  //k_c (only if Nakazato)
     vector<Jump> jumpRates;                  //returned by reference
@@ -305,8 +282,6 @@ int main(int argc, char* argv[]){
 
     if(def.isJackknife && !def.isLowMem)
       save.computeJackknife(def.outputFileName);
-
-  }  //END: of loop for re-running the simulation
 
   return 0;
 }

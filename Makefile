@@ -43,7 +43,7 @@ MY_HEADERS = classes.h auxiliary.h lattice.h save.h superInteraction.h
 SOURCES_BASIC  = lattice.cpp classes.cpp auxiliary.cpp save.cpp
 SOURCES_SUPER  = superInteraction.cpp main_super.cpp
 SOURCES_MAIN   = main.cpp
-SOURCES_EXTRA  = read_data.cpp brute.cpp
+SOURCES_EXTRA  = read_data.cpp
 
 OBJECTS_BASIC  = $(SOURCES_BASIC:.cpp=.o)
 OBJECTS_SUPER  = $(SOURCES_SUPER:.cpp=.o)
@@ -75,7 +75,7 @@ $(EXECUTABLE): $(OBJECTS_BASIC) $(OBJECTS_MAIN)
 clean:
 	touch -d20020101 Makedep.rule
 	make depend
-	\rm -vf $(OBJECTS_MAIN) $(OBJECTS_BASIC) $(OBJECTS_SUPER) $(EXECUTABLE) $(OBJECTS_EXTRA) super read_data brute
+	\rm -vf $(OBJECTS_MAIN) $(OBJECTS_BASIC) $(OBJECTS_SUPER) $(EXECUTABLE) $(OBJECTS_EXTRA) super read_data
 
 #use gz:
 tar:
@@ -93,9 +93,6 @@ lines:
 
 read_data: read_data.o save.o auxiliary.o classes.o
 	$(CC) $(LDFLAGS) read_data.o save.o classes.o auxiliary.o  -o $@
-
-brute: $(OBJECTS_BASIC) brute.o
-	$(CC) $(LDFLAGS) -o $@ $+
 
 # Dependencies for object files
 include Makedep.rule

@@ -86,16 +86,14 @@
                  parameters.
 
 
-  * -B N :: Generate N different output-files with the same input
-            parameters, by using Brute force, i.e. Just rerun the
-            simulation N times.
+  * -B :: Only use one data point in each trajectory. This guarantees
+          non-correlated data.
 
 
   * -b N :: Generate N different output-files (if =BOOTSTRAP_CONSERVE_MEMORY=
             is true, else print a matrix) with the same input parameters,
             by using bootstrap; after the simulation it generates N
-            synthetic output-files. NOTE: -B and -b are mutually exclusive,
-            can't use both.
+            synthetic output-files.
 
 
   * -k N :: Run N virtual simulations, and make a bootknife fitting to
