@@ -5,8 +5,11 @@
 #include <string>          //STL string
 #include <functional>      //STL function, needed for lambda-functions
 #include <algorithm>       //STL for min/max element finding in histogram
-#include <cassert>         //for assert()
 #include <omp.h>           //openMP = multi processing, declared with #pragmas
+#include "classes.h"         //to print bootstrap progress to screen
+#include "auxiliary.h"       //for the aux::printError()-function
+
+#include "save.h"            // for retarded reason, nr must be included after the cassert in save.h
 #include "nr/nr3.h"
 #include "nr/ludcmp.h"       //only depends on nr3.h
 #include "nr/svd.h"          //singular value decomposition
@@ -15,10 +18,6 @@
 #include "nr/gamma.h"        //needed by fitab.h (see NR p. 784)
 #include "nr/incgammabeta.h" //needed by fitab.h
 #include "nr/fitab.h"        //needed by computeSlope()
-
-#include "classes.h"         //to print bootstrap progress to screen
-#include "auxiliary.h"       //for the aux::printError()-function
-#include "save.h"
 
 //#include "nr/gaussj.h"      //needed by fitmrq.h
 //#include "nr/fitmrq.h"      //not yet in use...
@@ -316,8 +315,8 @@ void Save::dump(std::string baseName, std::string head){
   else{
 
     for(size_t i = 0; i < store_dr2_.size(); i++){
-		std::ostringstream fileName;
-		fileName << baseName << "_" << i;
+      std::ostringstream fileName;
+      fileName << baseName << "_" << i;
       std::ofstream file(fileName.str().c_str());
       file << head;
       file << "# t \t r^2 " << std::endl;
@@ -387,8 +386,8 @@ void Save::computeStdErr(void){
   //Optimization: avoid a[i] / b, use: c = 1/b; a[i] * c;
   double tmp = 1.0 / (1.0*noEnsembles_*(noEnsembles_ - 1));
 
-  assert(x2_mu_.size() == noSamplingTimes_);
-  assert(store_dx_.size() == noEnsembles_);
+  assert(x2_mu_.size() == (size_t) noSamplingTimes_);
+  assert(store_dx_.size() == (size_t) noEnsembles_);
 
 # pragma omp parallel for
   for(int i = 0; i < noSamplingTimes_; i++){
@@ -660,7 +659,7 @@ void Save::computeBootstrap(std::string name, int noOfRuns,
 
       matrixD_t H;
       //computeHmatrix1(H, catanateOutput, meanOfMsd, 1); //OLD SYNTAX TODO
-      computeHmatrix(H, catanateOutputFiles);
+      computeHmatrix(catanateOutputFiles, H);
 
       //print H-matrix to file, with "_matrix_bootstrap" appended:
       printHmatrix(H, name + "_matrix_bootstrap");

@@ -1,5 +1,5 @@
-#ifndef LATTICE_H
-#define LATTICE_H
+#ifndef BASELATTICE_H
+#define BASELATTICE_H
 
 #include <vector>
 
@@ -7,7 +7,6 @@
 #include "auxiliary.h"     //non-physics stuff. (print messages etc.)
 #include "classes.h"       //various data structures /classes (Jump, Particle)
 #include <functional>      // for std::function
-
 
 using std::vector;
 
@@ -177,10 +176,10 @@ public:
 
 
 
-class Lattice{
+class BaseLattice{
 public:
-  Lattice(int x, int y, int z, int N,
-          double deed, bool isBoundaryFix);
+  BaseLattice(int x, int y, int z, int dimension,
+              int particleNumber, double seed, bool boundaryFix);
 
   void place(void);                        //Place particles on the lattice
   void move(void);                         //pick a particle & direction based on jump-rate
@@ -194,7 +193,7 @@ public:
   void setDist(int, double);
 
   float computeNakazato(void);
-  float computeErgodicity(int,int,int);   //Calculate the theoretical MSD when ergodic
+  float computeErgodicity(int);            //Calculate the theoretical MSD when ergodic
   float computeAverageDiffusionConst(void);
   float computeEffectiveDiffusionConst(void);
 
@@ -221,7 +220,8 @@ protected:
   vector <long double> partialSum_;        //cumulative sum of jump-rates
 
   unsigned int dim_;                       //dimension of lattice (=1 || 2 || 3)
-  bool isBoundaryFix_;                       //"true" if fix, "false" if periodic
+  unsigned int directions_;                // directions on lattice
+  bool isBoundaryFix_;                     //"true" if fix, "false" if periodic
   double timeSum_;                         //Sum of time for each move
 
   vector<int> dx_,dy_,dz_;                 //pos. of tracer particle for current ensemble
@@ -233,9 +233,10 @@ protected:
   int windingNumber_0_z;
 
   void convertMuToParticle(int, int&, int&);
-  void computePartialSum(void);
+  void computePartialSum();                // used to find direction to move in
 
-  void moveAndBoundaryCheck(int,int);
+  virtual void moveAndBoundaryCheck(int,int) = 0;
+  virtual double distance(int &dx, int &dy, int &dz) = 0;
 
   int vacancyCheck(int, const Particle&);
 
@@ -248,8 +249,8 @@ protected:
   waitingtime tagged_waiting_time_;        // waiting time (lin,exp,pow) of the tagged particle
   double computeWaitingTime(void);
 
-private:                                    //not shared with suerInteraction
-  bool isInteractionOn_;                      //use the interaction algorithm
+protected:                                  //not shared with suerInteraction
+  bool isInteractionOn_;                    //use the interaction algorithm
   void interaction(int, Particle);
 };
 

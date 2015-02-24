@@ -1,10 +1,12 @@
 #ifndef SAVE_H
 #define SAVE_H
 
+#include <iostream>
+#include <cmath>
 #include <vector>
 #include <string>
 #include <functional>
-//#include <cassert>
+#include <cassert>
 #include "classes.h"
 
 class Save{
@@ -170,18 +172,18 @@ private:
                 << "matrix will be singular (first row and column =0)"
                 << std::endl;
 
-    //might not be N == noSamplingTimes_. (jackknige unbias test)
+    //if we use this function when bootstrapping, and might not want the
+    //same number of bootstrapped synthetic simulations as ensembles:
+    //(otherwise we could use the global "noEnsembles_" variable)
+    const double M = trajectories.size();
+    assert(M > 0);
+
+    //might not be N == noSamplingTimes_. (jackknife unbias test)
     int N = trajectories[0].size();
     matrix.assign(N, vectorD_t(N, 0));
 
     //initiate class, to print progress to screen,
     RemainingTime computationProgress(N);
-
-    //if we use this function when bootstrapping, and might not want the
-    //same number of bootstrapped synthetic simulations as ensembles:
-    //(otherwise we could use the global "noEnsembles_" variable)
-    const double M = trajectories.size();
-    //assert(M > 0); XXX TODO am i not allowed to have assert in templates?
 
     if(isMeanZero){
       double invM = 1.0 / M;

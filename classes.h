@@ -9,6 +9,16 @@ enum waitingtime {
   POW = 2,
 };
 
+// Just to print info to output file.
+inline std::ostream & operator<<(std::ostream & str, waitingtime wt){
+  switch (wt) {
+  case LIN: return str << "lin";
+  case EXP: return str << "exp";
+  case POW: return str << "pow";
+  default: return str << (int) wt;
+  }
+}
+
 //First three classes (Direction, Jump, Particle), will allow us to
 //get the position of a Particle object as: object.x, and the jump
 //rate as object.rate.x.r etc.

@@ -3,12 +3,12 @@
 
 #include <vector>
 #include <functional>      // for std::function
-#include "lattice.h"
+#include "lattices.h"
 #include "classes.h"
 
 //the class SuperInteraction inherits all the public and protected
 //methods and variables of the lattice-classs.
-class SuperInteraction : public Lattice{
+class SuperInteraction : public Square{
 private:
   float interactionStrength_;
 
