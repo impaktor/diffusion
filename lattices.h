@@ -44,7 +44,7 @@ public:
 
   // how to compute the distance on a lattice from three coordinates
   double distance(int &dx, int &dy, int &dz){
-    dx = pos_[0].x + windingNumber_0_x * latticeX_; // new positions in x
+    dx = pos_[0].x + windingNumber_0_x * latticeX_;   // new positions in x
     dy = pos_[0].y + windingNumber_0_y * latticeY_;
     dz = 0;
     return sqrt(pow((dx - pos_0_.x) + 0.5*(dy - pos_0_.y), 2) + 3.0/4.0*pow(dy - pos_0_.y, 2));

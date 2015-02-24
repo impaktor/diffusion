@@ -195,7 +195,7 @@ int main(int argc, char* argv[]){
         lattices.push_back(std::unique_ptr<Honeycomb2d>(new Honeycomb2d(latticeSize, nParticles, seed * (i+1), isBoundaryFix)));
       }
       else
-        aux::printerror("Wrong lattice specified in input file")
+        aux::printError("Wrong lattice specified in input file");
 
       lattices.back()->setSamplingTimes(samplingTimes, waitingTime);
 

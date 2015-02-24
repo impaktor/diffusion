@@ -229,7 +229,7 @@ void Save::store(const vectorI_t& dx, const vectorI_t& dy,
     //more rigorous way, but all tests I've made returns identical
     //output
     for(int i = 0; i < noSamplingTimes_; i++){
-      dr4_err_[i] += pow( dr[i] ,4);
+      dr4_err_[i] += pow( dr[i] ,4);  //NOTE: this only works for square lattice!
       dx4_err_[i] += pow( dx[i] ,4);
       dy4_err_[i] += pow( dy[i] ,4);
       dz4_err_[i] += pow( dz[i] ,4);
@@ -247,20 +247,12 @@ void Save::store(const vectorI_t& dx, const vectorI_t& dy,
     store_dy_.push_back(dy);
     store_dz_.push_back(dz);
 
-// //TMP store displacement squared. TODO: have lattice return this instead. XXX
-//     vectorD_t tmp(dr.size(),0);
-//     for(size_t i = 0; i < dr.size(); ++i)
-//       tmp[i] = pow(dr[i], 2);
-
-//     store_dr2_.push_back(tmp);
-
-//TMP2: Pigeon says the dr being fed into store from read_data.cpp
-//might be wrong, so I try using the dx,dy,dz instead:
-    vectorD_t dr_tmp(dx.size(),0);
-    for(size_t i = 0; i < dx.size(); ++i)
-      dr_tmp[i] = pow(dx[i], 2) + pow(dy[i], 2) + pow(dz[i], 2);
-
-    store_dr2_.push_back(dr_tmp);
+    //store displacement squared.
+    //NOTE; Pigeon says the dr being fed into store from read_data.cpp might be wrong
+    vectorD_t tmp(dr.size(),0);
+    for(size_t i = 0; i < dr.size(); ++i)
+      tmp[i] = pow(dr[i], 2);
+    store_dr2_.push_back(tmp);
   }
 }
 
