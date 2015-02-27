@@ -196,13 +196,17 @@
 - simpleini/ :: Folder for the SimpeIni files (2) to parse ini-files.
 
 
-- save.{h,cpp} :: Save routine. During simulation it stores the MSD for
-                  each individual /ensemble/ (trajectory), and then
-                  computes standard deviation, correlation, etc, and prints
-                  results to a file.
+- save.{h,cpp} :: Save routine. During simulation it stores the MSD for each
+                  individual /ensemble/ (trajectory), and then computes
+                  standard deviation, correlation, etc, and prints results to
+                  a file.
 
 
-- lattice.{h,cpp} :: This is where the physics happens.
+- baselattice.{h,cpp} :: This is where the physics happens.
+
+
+- lattices.{h,cpp} :: This inherits from baselattice, and implements the
+                      geometry of the lattice.
 
 
 - classes.{h,cpp} :: Defines the Particle class which depends on Jump
@@ -219,12 +223,12 @@
 
 * Hard-coded variables:
   To not use winding number when using periodic boundary conditions,
-  check the commented code in =void Lattice::move()=. With the use of
+  check the commented code in =void BaseLattice::move()=. With the use of
   winding numbers we keep track on how many times the tracer has
   circled (jumped off) the lattice.
 
   Generally, hard-coded variables are defined in the head of
-  =save.cpp=, and =lattice.cpp=.
+  =save.cpp=, and =baselattice.cpp=.
 
 * Super-Interaction code                                           :noexport:
   If running =./super -i N=, it will run the super interaction code
@@ -247,9 +251,9 @@
   testing if-statements that are there to find bugs. The most used
   functions are:
 
-:  Lattice::moveAndBoundaryCheck
-:  Lattice::vacancyCheck
-:  Lattice::convertMuToParticle
+:  BaseLattice::moveAndBoundaryCheck
+:  BaseLattice::vacancyCheck
+:  BaseLattice::convertMuToParticle
 
   Also it is a good idea to compile with =-D NDEBUG= (see Makeflile)
   when running real (non-testing) simulations, as this disables any
