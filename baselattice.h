@@ -108,9 +108,8 @@ public:
 
     unsigned int computeVacant = x_dim_*y_dim_*z_dim_ - p.size();
     if(count_vacant_sites != computeVacant){
-      std::cerr << "Error in vacant sites" << std::endl
-                << "# of vacant sites: " << count_vacant_sites << std::endl;
       isCorrect = false;
+      throw std::string( "number of vacant sites: " + tostring(count_vacant_sites));
     }
 
     return isCorrect;

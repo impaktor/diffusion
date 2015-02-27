@@ -2,11 +2,19 @@
 #define AUXILARY_H
 
 #include <string>
+#include <sstream>              // for ostringstream
 
 //This file contains implementations that have nothing to do with
 //physics, such as reading command arguments (flags), print error
 //messages
 
+// convert anything to string:
+template<class T>
+static std::string tostring(const T &t){
+  std::ostringstream s;
+  s << t;
+  return s.str();
+}
 
 
 struct InputValues{
@@ -63,11 +71,6 @@ namespace aux{
   bool convertToBool(const char * c, std::string);
 
   //Prints message, and aborts the program.
-  void printError(std::string message);
-  void printError(std::string message);
-  void printError(std::string message, int line);
-  void printError(std::string message, std::string file, int line);
-
   void printHelp(char**);
 }
 

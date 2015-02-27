@@ -4,6 +4,7 @@
 #include <functional>      // for std::function
 #include <vector>
 
+#include "auxiliary.h"     //for tostring() function
 #include "classes.h"       //various data structures /classes (Jump, Particle)
 #include "baselattice.h"   //this is the main class, that does the physics.
 
@@ -26,7 +27,7 @@ BaseLattice::BaseLattice(int x, int y, int z, int dimension,
   : randomNumber(seed), board_(x, y, z){
 
   if (particleNumber >= x*y*z)
-    aux::printError("Number of particles must be <= number of squares");
+    throw std::string("Number of particles must be <= number of squares");
 
   dim_ = dimension;
   directions_ = dim_ * 2;
@@ -126,7 +127,7 @@ void BaseLattice::setSamplingTimes(const vector<double>& samplingTime,
   noSamplingTimes_ = (int) samplingTime.size();
 
   if (noSamplingTimes_ < 1)
-    aux::printError("No sampling times set!");
+    throw std::string("No sampling times set!");
 
   //check that it is monotonously increasing:
   bool isOrdered = true;
@@ -152,7 +153,7 @@ void BaseLattice::setSamplingTimes(const vector<double>& samplingTime,
     dr_.assign(noSamplingTimes_,0);
   }
   else
-    aux::printError("Sampling times are not ordered.");
+    throw std::string("Sampling times are not ordered");
 }
 
 
@@ -194,7 +195,7 @@ int BaseLattice::vacancyCheck(int n, const Particle& oldPos){
   int returnvalue = 0;   //unused parameter to register collisions
 
   if (n > noParticles_ || 0 > n)
-    aux::printError("accessing invalid particle");
+    throw std::string("accessing invalid particle");
 
   if (board_.isOccupied(pos_[n])){ //if occupied
     if (isTestOn_)
@@ -356,7 +357,7 @@ void BaseLattice::computePartialSum(){
 
   //check the jump-rate-vectors
   if ((int) jumpRate_.size() != noParticles_)
-    aux::printError("number of jumprates, != N");
+    throw std::string("number of jumprates, != N");
 
   //build partialSum-vector
   if(directions_ >= 2){
@@ -393,7 +394,7 @@ void BaseLattice::computePartialSum(){
   //check for errors: It must increase monotonically:
   for (int i = 1; i < noParticles_; i++)
     if (partialSum_[i] < partialSum_[i-1])
-      aux::printError("jump rate cumul. sum non-monotonically increasing");
+      throw std::string("jump rate cumul. sum non-monotonically increasing");
 }
 
 // ----------------------
@@ -413,7 +414,7 @@ void BaseLattice::setJumpRate(const vector<Jump>& jumpRate){
     computePartialSum();
   }
   else
-    aux::printError("number of jumprates must equal number of particles");
+    throw std::string("number of jumprates must equal number of particles");
 }
 
 
@@ -459,11 +460,9 @@ void BaseLattice::convertMuToParticle(const int mu, int& n, int& direction){
       }
     }
   }
-  else{
-    std::cout << "mu =  "<< mu <<std::endl;
-    std::cout << "partialSum_.size: "<<partialSum_.size() << std::endl;
-    aux::printError("mu or partialSum_ not correct.");
-  }
+  else
+    throw std::string("mu=" + tostring(mu) + "or partialSum_=" +
+                      tostring(partialSum_.size()) + "not correct");
 }
 
 

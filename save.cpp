@@ -7,7 +7,6 @@
 #include <algorithm>       //STL for min/max element finding in histogram
 #include <omp.h>           //openMP = multi processing, declared with #pragmas
 #include "classes.h"         //to print bootstrap progress to screen
-#include "auxiliary.h"       //for the aux::printError()-function
 
 #include "save.h"            // for retarded reason, nr must be included after the cassert in save.h
 #include "nr/nr3.h"
@@ -100,10 +99,10 @@ void Save::computePearsonCoefficient(){
   //perhaps check: Physical Review D vol 34, 2469 (1986), sec. D
 
   if(isLowMem_)               //need data to work on
-    aux::printError("Can not compute correlation, no available data.");
+    throw std::string("Can not compute correlation, no available data.");
 
   if(r2_mu_.empty())          //need data to work on
-    aux::printError("Must compute MSD first! (ie. r2_mu_)");
+    throw std::string("Must compute MSD first! (ie. r2_mu_)");
 
   //compute the correlation between two points, i, j, for i = j+1
   vectorD_t h(noSamplingTimes_,0);

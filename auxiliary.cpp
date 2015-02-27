@@ -75,16 +75,13 @@ void aux::argumentFlags(int argc, char** argv, InputValues &in){
       //return 1;
       break;
     default:
-      std::cout << "Non-critical error in pogram (bad programming)"<< std::endl;
-      abort();
+      throw std::string("Non-critical error in pogram (bad programming)");
     }
 
   //print error message if we entered case '?' above
-  if(error){
-    std::cout << argv[0] << ": undefined entry." << std::endl
-         << "Try \"" << argv[0] << " -h\" for help." << std::endl;
-    exit(1);
-  }
+  if(error)
+    throw std::string(tostring(argv[0]) + ": undefined entry.\nTry \"" +
+                      tostring(argv[0]) + " -h\" for help");
 }
 
 
@@ -103,7 +100,7 @@ bool aux::convertToBool(const char * c, std::string where){
   else if(str == "false")
     val = false;
   else
-    printError("Could not parse:" + str + " in: " + where);
+    throw std::string("Could not parse:" + str + " in: " + where);
 
   return val;
 }
@@ -136,29 +133,4 @@ void aux::printHelp(char** argv){
             << "Puts the output in the folder \"5.5\" with the name \"uniform04.dat\"."
             << std::endl;
   exit(0);
-}
-
-
-
-
-
-std::string ERROR = "\033[1;31mERROR \033[0m";
-
-void aux::printError(std::string message){
-  std::cerr <<"\n" + ERROR + message << std::endl;
-  abort();
-}
-
-
-//use __FILE__ and __LINE__ macro to get line and filename;
-void aux::printError(std::string message, int line){
-  std::cerr <<"\n Error occured at line: " << line
-            << std::endl << message << std::endl;
-  abort();
-}
-
-void aux::printError(std::string message, std::string file, int line){
-  std::cerr <<"\n Error occured in file " << file << " at line: " << line
-            << std::endl << message << std::endl;
-  abort();
 }

@@ -47,6 +47,8 @@ inline std::ostream & operator<<(std::ostream & str, geometry X){
 int main(int argc, char* argv[]){
 
   InputValues def;                     //initiate default paramter values
+
+  try{
   aux::argumentFlags(argc, argv, def); //read in command line options
 
 
@@ -66,7 +68,7 @@ int main(int argc, char* argv[]){
   SI_Error rc = ini.LoadFile(input_file);
   if (rc < 0){
     aux::printHelp(argv);
-    aux::printError("invalid inputfile path: " + std::string(input_file));
+    throw std::string("invalid inputfile path: " + std::string(input_file));
   }
 
   //start parsing "key = value" from input-file with section "lattice"
@@ -120,10 +122,8 @@ int main(int argc, char* argv[]){
   //with identical jumprates!
   if ((def.isInteracting && jumprateDistribution != 3) ||
       (jumprateCrowders != jumprateTracer
-       && jumprateDistribution == 3 && def.isInteracting)){
-    std::cout << "\nWARNING!! using interaction-code but"
-              << " not identical jumprates! \a\n" << std::endl;
-  }
+       && jumprateDistribution == 3 && def.isInteracting))
+    throw std::string("using interaction-code but not identical jumprates!");
 
   //Construct vector of sampling times
   std::vector<double> samplingTimes;
@@ -195,7 +195,7 @@ int main(int argc, char* argv[]){
         lattices.push_back(std::unique_ptr<Honeycomb2d>(new Honeycomb2d(latticeSize, nParticles, seed * (i+1), isBoundaryFix)));
       }
       else
-        aux::printError("Wrong lattice specified in input file");
+        throw std::string("Wrong lattice specified in input file"); // Note: must compile in serial to see this string
 
       lattices.back()->setSamplingTimes(samplingTimes, waitingTime);
 
@@ -323,6 +323,13 @@ int main(int argc, char* argv[]){
   //   save.investigateMuConvergeance();
   // }
 
+  }
+  catch(std::string s)
+  {
+    std::cerr << "Error: " << s << "\n";
+    return 1;
+  }
+
   return 0;
 }
 
@@ -383,10 +390,10 @@ void computeJumpRates(std::vector<Jump>& hopRate, float& info, int N, float jump
     }
     else{
       if (n > 3 || n <0 )
-        std::cout << "Invalid value/choice for prob.distribution ("<< n <<")"
-                  << std::endl;
+        throw std::string("Invalid value/choice for prob.distribution ("
+                          + tostring(n) + ")");
       else
-        aux::printError("Random number for jumprate must be 0 < r < 1");
+        throw std::string("Random number for jumprate must be 0 < r < 1");
     }
 
     //Manually set the jumprate of the tracer particle (first one)

@@ -124,17 +124,13 @@ void Square::moveAndBoundaryCheck(int n, int R){
       }
 
     }
-    else{
-      std::cout << "There is a maximum of " << 2 * dim_
-                << " positive directions to move in" << std::endl;
-      abort();
-    }
+    else
+      throw std::string("There is a maximum of " + tostring( 2 * dim_) +
+                        " positive directions to move in");
   }
-  else{
-    std::cout << "Invalid particle label, n=" << n
-              << ", must fulfill 0 <= n < N" << std::endl;
-    abort();
-  }
+  else
+    throw std::string("Invalid particle label, n=" + tostring(n) +
+                      ", must fulfill 0 <= n < N");
 }
 
 
@@ -284,15 +280,11 @@ void Honeycomb2d::moveAndBoundaryCheck(int n, int R){
       }
 
     }
-    else{
-      std::cout << "There is a maximum of " << 2 * dim_
-                << " positive directions to move in" << std::endl;
-      abort();
-    }
+    else
+      throw std::string("There is a maximum of " + tostring( 2 * dim_) +
+                        " positive directions to move in");
   }
-  else{
-    std::cout << "Invalid particle label, n=" << n
-              << ", must fulfill 0 <= n < N" << std::endl;
-    abort();
-  }
+  else
+    throw std::string("Invalid particle label, n=" + tostring(n) +
+                      ", must fulfill 0 <= n < N");
 }
