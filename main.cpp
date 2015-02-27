@@ -7,7 +7,7 @@
 //#include <thread>      //new C++ standard! same as old boost_threads
 #include <map>
 #include <cassert>
-
+#include <memory>      //for smart pointers
 #include <sstream>     //for [o]stringstream
 
 //Random number generator from numerical recipes 3 ed, but
@@ -15,28 +15,34 @@
 #include "nr/ran_mod.h"
 
 #include "simpleini/SimpleIni.h" //parse ini-file
-#include <stdlib.h>    //atoi
+#include <stdlib.h>              //atoi
 
-#include "auxiliary.h" //non-physics stuff. (print messages etc.)
-#include "classes.h"   //various data structures /classes (Jump, Particle)
-#include "lattice.h"   //this is the main class, that does the physics.
-#include "save.h"      //class to save MSD, compute errors, and print to file
+#include "auxiliary.h"           //non-physics stuff. (print messages etc.)
+#include "classes.h"             //various data structures /classes (Jump, Particle)
+#include "baselattice.h"         //this is the main class, that does the physics.
+#include "lattices.h"            //this is the main class, that does the physics.
+#include "save.h"                //class to save MSD, compute errors, and print to file
 
 
 void computeJumpRates(std::vector<Jump>&, float&, int, float, float, float, int);
 
-const std::string getWaitTime(enum waitingtime wt)
-{
-   switch (wt)
-   {
-      case LIN: return "lin";
-      case EXP: return "exp";
-      case POW: return "pow";
-   }
-   return "Error";
+enum geometry {
+  square1d = 1,
+  square2d,
+  square3d,
+  honeycomb2d,
+};
+
+// Just to print info to output file.
+inline std::ostream & operator<<(std::ostream & str, geometry X){
+  switch (X) {
+  case square1d: return str << "Square 1D";
+  case square2d: return str << "Square 2D";
+  case square3d: return str << "Square 3D";
+  case honeycomb2d: return str << "Honeycomb 2D";
+  default: return str << (int) X;
+  }
 }
-
-
 
 int main(int argc, char* argv[]){
 
@@ -67,9 +73,9 @@ int main(int argc, char* argv[]){
   const char * tmpValue = ini.GetValue("lattice", "fix_boundary", NULL /* default*/);
   bool isBoundaryFix = aux::convertToBool(tmpValue, "fix_boundary");
 
-  int X = atoi(ini.GetValue("lattice", "x", NULL));
-  int Y = atoi(ini.GetValue("lattice", "y", NULL));
-  int Z = atoi(ini.GetValue("lattice", "z", NULL));
+  geometry latticeGeometry = static_cast<geometry>(atoi(ini.GetValue("lattice", "geometry", NULL)));
+
+  int latticeSize = atoi(ini.GetValue("lattice", "l", NULL));
 
   int nParticles = atoi(ini.GetValue("particles", "N", NULL));
 
@@ -109,7 +115,6 @@ int main(int argc, char* argv[]){
   int noHistogramBins = atoi(tmpValue);
 
   //=============================================
-
 
   //When using the interaction code, make sure I have Nakazato distribution
   //with identical jumprates!
@@ -153,30 +158,54 @@ int main(int argc, char* argv[]){
   //(also computes standard error and correlation estimate)
   Save save(samplingTimes, ensembles, def.isLowMem.first);
 
-  std::vector<Lattice> lattices;   //possibility to store many lattice obj.
-  int noLattice = 1;               //default to one Lattice object...
-  int lattice_index = 0;           //... stored in first element of vector
+  //store (pointers to) lattices, one for each thread, and they can be
+  //of any derived class from BaseLattice, and set a run-time.
+  std::vector<std::unique_ptr<BaseLattice> > lattices;
+
+  int dim = 0;                                       // dimension of lattice
+  int noLattice = 1;                                 //default to one Lattice object...
+  int lattice_index = 0;                             //... stored in first element of vector
 # pragma omp parallel shared(save,lattices,noLattice) private(lattice_index)
   {
-#   ifdef _OPENMP                       //If compiling with OpenMP...
-    noLattice = omp_get_num_threads();  //change to threads" number of lattices.
+#   ifdef _OPENMP                      //If compiling with OpenMP...
+    noLattice = omp_get_num_threads(); //change to threads" number of lattices.
 #   endif
 
 #   pragma omp single                   //only do this once in total.
     for(int i = 0; i < noLattice; ++i){ //Initiate the Lattice, (does all the physics)
 
-      Lattice tmp(X, Y, Z, nParticles, seed * (i+1), isBoundaryFix);
-      tmp.setSamplingTimes(samplingTimes, waitingTime);
+      if(latticeGeometry == geometry::square1d){
+        dim = 1;
+        // lattices.push_back(std::make_unique<Square>(latticeSize,1,1, dim, nParticles, seed * (i+1), isBoundaryFix));
+        lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,1,1, dim,
+                                                              nParticles, seed * (i+1), isBoundaryFix)));
+      }
+      else if(latticeGeometry == geometry::square2d){
+        dim = 2;
+        lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,latticeSize,1, dim,
+                                                              nParticles, seed * (i+1), isBoundaryFix)));
+      }
+      else if(latticeGeometry == geometry::square3d){
+        dim = 3;
+        lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,latticeSize,latticeSize, dim,
+                                                              nParticles, seed * (i+1), isBoundaryFix)));
+      }
+      else if(latticeGeometry == geometry::honeycomb2d){
+        dim = 2;
+        lattices.push_back(std::unique_ptr<Honeycomb2d>(new Honeycomb2d(latticeSize, nParticles, seed * (i+1), isBoundaryFix)));
+      }
+      else
+        aux::printError("Wrong lattice specified in input file");
+
+      lattices.back()->setSamplingTimes(samplingTimes, waitingTime);
 
       //Only actually needed for our "computeNakazato"-function.
-      tmp.setJumpNaka(jumprateCrowders, jumprateTracer);
-      tmp.setJumpRate(jumpRates);
+      lattices.back()->setJumpNaka(jumprateCrowders, jumprateTracer);
+      lattices.back()->setJumpRate(jumpRates);
 
       //if use Interaction algorithm, with InteractStr
       if(def.isInteracting)
-        tmp.setInteraction(def.interactionStrength);
-
-      lattices.push_back(tmp);
+        lattices.back()->setInteraction(def.interactionStrength);
     }
 
 #   ifdef _OPENMP                         //if compiling with OpenMP:
@@ -204,14 +233,14 @@ int main(int argc, char* argv[]){
         for(size_t k = 0; k < samplingTimes.size(); ++k) {
 
           std::vector<double>::iterator it_begin = samplingTimes.begin();
-          lattices[lattice_index].setSamplingTimes(std::vector<double>(it_begin, it_begin + k+1), waitingTime);
+          lattices[lattice_index]->setSamplingTimes(std::vector<double>(it_begin, it_begin + k+1), waitingTime);
 
-          lattices[lattice_index].place();
-          lattices[lattice_index].move();
+          lattices[lattice_index]->place();
+          lattices[lattice_index]->move();
 
           std::vector<int> dx_sub,dy_sub,dz_sub; //save subset of x, y, z, data
           std::vector<double> dr_sub;
-          lattices[lattice_index].getDisplacement(dx_sub, dy_sub, dz_sub, dr_sub);
+          lattices[lattice_index]->getDisplacement(dx_sub, dy_sub, dz_sub, dr_sub);
 
           dx.push_back(dx_sub.back());           //only store/use last element
           dy.push_back(dy_sub.back());
@@ -220,9 +249,9 @@ int main(int argc, char* argv[]){
         }
       }
       else{
-        lattices[lattice_index].place();
-        lattices[lattice_index].move();
-        lattices[lattice_index].getDisplacement(dx, dy, dz, dr);
+        lattices[lattice_index]->place();
+        lattices[lattice_index]->move();
+        lattices[lattice_index]->getDisplacement(dx, dy, dz, dr);
       }
 
 #     pragma omp critical  //only one thread may write at a time:
@@ -236,17 +265,16 @@ int main(int argc, char* argv[]){
   std::string dist[]     = {"uniform","exponential","powerlaw","nakazato"};
   std::string onOff[]    = {"Off","On"};
   std::string bound[]    = {"periodic","fix"};
-  float d_eff = lattices[0].computeEffectiveDiffusionConst();
-  float d_av = lattices[0].computeAverageDiffusionConst();
+  float d_eff = lattices[0]->computeEffectiveDiffusionConst();
+  float d_av = lattices[0]->computeAverageDiffusionConst();
 
   //print three lines of info about simulation to head of each outfile:
   std::ostringstream print;
-  print << "#E = " << ensembles <<"\t N = " << nParticles << "\t X-Y-Z: " //line1
-        << X << "x" << Y << "x" << Z << "\t 2*d*D_naka: "
-        << lattices[0].computeNakazato() << "  Waiting time: "
-        << getWaitTime(waitingTime) << std::endl;
-  print << "#Conc.: "<< (float) nParticles/(X*Y*Z) << "\t MSD_equil: "  //line2
-        << lattices[0].computeErgodicity(X,Y,Z)
+  print << "#E = " << ensembles <<"\t N = " << nParticles << "\t latticeSize: " //line1
+        << latticeSize <<"\t geometry: " << latticeGeometry << "\t 2*d*D_naka: "
+        << lattices[0]->computeNakazato() << "  Waiting time: " << waitingTime << std::endl;
+  print << "#Conc.: "<< (float) nParticles/pow(latticeSize,dim) << "\t MSD_equil: "  //line2
+        << lattices[0]->computeErgodicity(latticeSize)
         << "\t distr: " << dist[jumprateDistribution] << " (" << info
         << ")\t bound: " << bound[isBoundaryFix] << std::endl;
   print << "#D_eff: " << d_eff << "\t k_tagg: "                //line3

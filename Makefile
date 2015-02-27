@@ -38,9 +38,9 @@ endif
 
 ########################### END #######################################
 
-MY_HEADERS = classes.h auxiliary.h lattice.h save.h superInteraction.h
+MY_HEADERS = classes.h auxiliary.h baselattice.h lattices.h save.h superInteraction.h
 
-SOURCES_BASIC  = lattice.cpp classes.cpp auxiliary.cpp save.cpp
+SOURCES_BASIC  = baselattice.cpp lattices.cpp classes.cpp auxiliary.cpp save.cpp
 SOURCES_SUPER  = superInteraction.cpp main_super.cpp
 SOURCES_MAIN   = main.cpp
 SOURCES_EXTRA  = read_data.cpp

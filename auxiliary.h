@@ -47,7 +47,7 @@ public:
     outputFileName =      "out.dat";
     inputFileName =       "input.ini";
     nOutputs =            1;
-    method =              'b';
+    method =              '-';
     isBootknife =         false;
     nBootknife =          1;    //what is this? XXX TODO
     isJackknife =         false;

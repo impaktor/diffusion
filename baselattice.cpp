@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "classes.h"       //various data structures /classes (Jump, Particle)
-#include "lattice.h"       //this is the main class, that does the physics.
+#include "baselattice.h"   //this is the main class, that does the physics.
 
 using std::vector;
 
@@ -20,21 +20,21 @@ const bool TEST_1            = false;
 // C O N S T R U C T O R
 // =====================
 
-Lattice::Lattice(int xSquare, int ySquare, int zSquare,
-                 int particleNumber, double seed, bool boundaryFix)
+BaseLattice::BaseLattice(int x, int y, int z, int dimension,
+                         int particleNumber, double seed, bool boundaryFix)
   //initiate the random number generator with "seed" just given above
-  : randomNumber(seed), board_(xSquare, ySquare, zSquare){
+  : randomNumber(seed), board_(x, y, z){
 
-  if (xSquare < ySquare || ySquare  < zSquare || zSquare < 1)
-    aux::printError("X,Y,Z must be 1 or bigger, and X >= Y >= Z");
-
-  if (particleNumber >= xSquare*ySquare*zSquare)
+  if (particleNumber >= x*y*z)
     aux::printError("Number of particles must be <= number of squares");
 
+  dim_ = dimension;
+  directions_ = dim_ * 2;
+
   //number of lattice sites
-  latticeX_ = xSquare;
-  latticeY_ = ySquare;
-  latticeZ_ = zSquare;
+  latticeX_ = x;
+  latticeY_ = dim_ >= 2 ? y : 1;
+  latticeZ_ = dim_ == 3 ? z : 1;
 
   noParticles_ = particleNumber;
 
@@ -45,7 +45,6 @@ Lattice::Lattice(int xSquare, int ySquare, int zSquare,
   pos_0_.y = round(1.0*latticeY_/2);
   pos_0_.z = round(1.0*latticeZ_/2);
 
-
   windingNumber_0_x = 0;
   windingNumber_0_y = 0;
   windingNumber_0_z = 0;
@@ -55,18 +54,13 @@ Lattice::Lattice(int xSquare, int ySquare, int zSquare,
   //boolean, for print details to screen.
   isTestOn_ = TEST_1;
 
-  //Define the dimension of the lattice
-  if (latticeY_<=1 && latticeZ_<=1) dim_ = 1;
-  if (latticeY_>1 && latticeZ_<=1)  dim_ = 2;
-  if (latticeY_>1 && latticeZ_>1)   dim_ = 3;
-
   //By default: don't use the interaction algorithm.
   interactionStrength_ = 0;
   isInteractionOn_ = false;
 }
 
 
-void Lattice::place(void){
+void BaseLattice::place(void){
   //This function will be called once each ensemble to
   //place the N particles (randomly), and reset the time
 
@@ -124,7 +118,7 @@ void Lattice::place(void){
 // PUBLIC: SET FUNCTIONS:
 // ---------------------
 
-void Lattice::setSamplingTimes(const vector<double>& samplingTime,
+void BaseLattice::setSamplingTimes(const vector<double>& samplingTime,
                                waitingtime tagged_waiting_time = waitingtime::LIN){
 
   tagged_waiting_time_ = tagged_waiting_time;
@@ -162,13 +156,13 @@ void Lattice::setSamplingTimes(const vector<double>& samplingTime,
 }
 
 
-void Lattice::setJumpNaka(const float jumpCrowders,
+void BaseLattice::setJumpNaka(const float jumpCrowders,
                           const float jumpTracer){
   jumpCrowders_ = jumpCrowders;
   jumpTracer_ = jumpTracer;
 }
 
-void Lattice::setInteraction(const float interactionStrength){
+void BaseLattice::setInteraction(const float interactionStrength){
   interactionStrength_ = interactionStrength;
   isInteractionOn_ = true;
 }
@@ -179,12 +173,12 @@ void Lattice::setInteraction(const float interactionStrength){
 // ---------------------
 
 //could be useful to have, but not necessary...
-int Lattice::getDimension(void) const{
+int BaseLattice::getDimension(void) const{
   return dim_;
 }
 
 
-void Lattice::getDisplacement(vector<int>& dx, vector<int>& dy,
+void BaseLattice::getDisplacement(vector<int>& dx, vector<int>& dy,
                               vector<int>& dz, vector<double>& dr) const{
   //Get the displacement of the tracer particle
   //from the current "ensemble"
@@ -195,140 +189,8 @@ void Lattice::getDisplacement(vector<int>& dx, vector<int>& dy,
 }
 
 
-void Lattice::moveAndBoundaryCheck(int n, int R){
-  //Move particle "n" in direction "R", according to the "boundary"
-  //rules (fix (1) or periodic (0)), IF the new site is vacant.
-
-  //windingNumber was added in April 7th 2011, to count the number of laps
-  //the particle has made around the lattice/edge.
-
-  if (0 <= n && n < noParticles_ ){
-    if (isTestOn_) std::cout << "Moving particle " << n << std::endl;
-    // n = particle to move, R = direction to move, such that:
-    //      R= 0 = X-right,      1 = X-left
-    //         2 = Y-right,      3 = Y-left
-    //         4 = Z-up,         5 = Z-down
-    // boundary: boundary=0 = periodic, boundary=1 = fix boundary
-
-    //Store in case we want to restore the previous configuration
-    Particle old = pos_[n];
-
-    //If I need to restore previous position across a boundary
-    //I need to know this, (see further down)
-    bool changingWindingNumber = false;
-
-    if ( R >= 0 && R < 6 ){
-      switch(R){
-      case 0: pos_[n].x = pos_[n].x +1;
-        if (pos_[n].x == latticeX_ +1){
-            pos_[n].x = isBoundaryFix_ ? old.x : 1;
-
-            //if the tagged particle...
-            if (n==0 && !isBoundaryFix_){
-              windingNumber_0_x++;
-              changingWindingNumber = true;
-            }
-        }
-        break;
-      case 1: pos_[n].x = pos_[n].x -1; //move particle n to the left
-        if (pos_[n].x == 0){
-          pos_[n].x = isBoundaryFix_ ? old.x : latticeX_;
-
-          if (n==0 && !isBoundaryFix_){
-            windingNumber_0_x--;
-            changingWindingNumber = true;
-          }
-        }
-        break;                          //(first coordinate is 1, 0=outside)
-      case 2: pos_[n].y = pos_[n].y +1;
-        if (pos_[n].y == latticeY_ +1){
-          pos_[n].y = isBoundaryFix_ ? old.y : 1;
-
-          if (n==0 && !isBoundaryFix_){
-            windingNumber_0_y++;
-            changingWindingNumber = true;
-          }
-        }
-        break;
-      case 3: pos_[n].y = pos_[n].y -1;
-        if (pos_[n].y == 0 ){
-          pos_[n].y = isBoundaryFix_ ? old.y : latticeY_;
-
-          if (n==0 && !isBoundaryFix_){
-            windingNumber_0_y--;
-            changingWindingNumber = true;
-          }
-        }
-        break;
-      case 4: pos_[n].z = pos_[n].z +1;
-        if (pos_[n].z == latticeZ_+1){
-          pos_[n].z = isBoundaryFix_ ? old.z : 1;
-
-          if (n==0 && !isBoundaryFix_){
-            windingNumber_0_z++;
-            changingWindingNumber = true;
-          }
-        }
-        break;
-      case 5: pos_[n].z = pos_[n].z-1;
-        if (pos_[n].z == 0){
-          pos_[n].z = isBoundaryFix_ ? old.z : latticeZ_;
-
-          if (n==0 && isBoundaryFix_ == 0){
-              windingNumber_0_z--;
-              changingWindingNumber = true;
-          }
-        }
-        break;
-      }
-
-      //check that the new site is vacant if not, move the particle
-      //back. (done by the vacancyCheck...)  (and if using
-      //windingnumber, reset it.)
-
-      bool resetWindingNumber = vacancyCheck(n,old);
-
-      //now reset windingnumber if I'm colliding at the boundary:
-      if (resetWindingNumber && changingWindingNumber){
-        switch(R) {
-        case 0:
-          windingNumber_0_x--;
-          break;
-        case 1:
-          windingNumber_0_x++;
-          break;
-        case 2:
-          windingNumber_0_y--;
-          break;
-        case 3:
-          windingNumber_0_y++;
-          break;
-        case 4:
-          windingNumber_0_z--;
-          break;
-        case 5:
-          windingNumber_0_z++;
-          break;
-        }
-      }
-
-    }
-    else{
-      std::cout << "There is a maximum of " << 2 * dim_
-                << " positive directions to move in" << std::endl;
-      abort();
-    }
-  }
-  else{
-    std::cout << "Invalid particle label, n=" << n
-              << ", must fulfill 0 <= n < N" << std::endl;
-    abort();
-  }
-}
-
-
 //check if site is vacant or not
-int Lattice::vacancyCheck(int n, const Particle& oldPos){
+int BaseLattice::vacancyCheck(int n, const Particle& oldPos){
   int returnvalue = 0;   //unused parameter to register collisions
 
   if (n > noParticles_ || 0 > n)
@@ -368,7 +230,7 @@ int Lattice::vacancyCheck(int n, const Particle& oldPos){
 }
 
 
-double Lattice::computeWaitingTime(void){
+double BaseLattice::computeWaitingTime(void){
 
   //one time step for crowding particle
   double tau = 0;
@@ -401,7 +263,7 @@ double Lattice::computeWaitingTime(void){
 }
 
 
-void Lattice::move(){
+void BaseLattice::move(){
 
   double tau;      //waiting time
   int i = 0;       //index of samplingTime-vector
@@ -419,12 +281,8 @@ void Lattice::move(){
     while(timeSum_ <= samplingTime_[i] &&
           samplingTime_[i] < timeSum_ + tau  && i < noSamplingTimes_){
 
-      //save displacement (from previous step)
-      dx_[i] = pos_[0].x - pos_0_.x + windingNumber_0_x * latticeX_;
-      dy_[i] = pos_[0].y - pos_0_.y + windingNumber_0_y * latticeY_;
-      dz_[i] = pos_[0].z - pos_0_.z + windingNumber_0_z * latticeZ_;
-
-      dr_[i] = sqrt( pow(dx_[i],2) + pow(dy_[i],2) + pow(dz_[i],2) );
+      //save displacement (from previous step), depends on geometry of lattice
+      dr_[i] = distance(dx_[i], dy_[i], dz_[i]);
 
       i++;
     }
@@ -433,7 +291,7 @@ void Lattice::move(){
 
     int mu_guess;       // must be integer. (index of vector)
     int mu_left = 0;
-    int mu_right = dim_ * 2 * noParticles_;
+    int mu_right = directions_ * noParticles_;
     double p_left = (double) partialSum_.front(); //value in first element (=0)
     double p_right = (double) partialSum_.back(); //value in last element (=dim_*2*N)
 
@@ -486,30 +344,7 @@ void Lattice::move(){
   }
 }
 
-
-
-// ----------------------
-// JUMPRATE SPECIFIC CODE
-// ----------------------
-
-
-void Lattice::setJumpRate(const vector<Jump>& jumpRate){
-  if ((int) jumpRate.size() == noParticles_){
-
-    // remove jumprates from previous runs but now we are quenched so
-    // not needed (I think) TODO (is this right?)
-    jumpRate_.clear();
-    jumpRate_ = jumpRate;
-
-    //Use these vectors to build the partial sum
-    computePartialSum();
-  }
-  else
-    aux::printError("number of jumprates must equal number of particles");
-}
-
-
-void Lattice::computePartialSum(void){
+void BaseLattice::computePartialSum(){
   long double tmp = 0;
   int i;
 
@@ -524,7 +359,7 @@ void Lattice::computePartialSum(void){
     aux::printError("number of jumprates, != N");
 
   //build partialSum-vector
-  if(dim_>=1){
+  if(directions_ >= 2){
     for(i=0; i < noParticles_ ; i++){
       tmp += jumpRate_[i].x.r;
       partialSum_.push_back(tmp);  //index 1 ... N
@@ -534,7 +369,7 @@ void Lattice::computePartialSum(void){
       partialSum_.push_back(tmp);  //index N+1 ... 2N
     }
   }
-  if (dim_ >=2 ){
+  if (directions_ >= 4 ){
     for (i=0; i < noParticles_; i++ ){
       tmp += jumpRate_[i].y.r;
       partialSum_.push_back(tmp);   //index 2N+1 ... 3N
@@ -544,7 +379,7 @@ void Lattice::computePartialSum(void){
       partialSum_.push_back(tmp);   //index 3N+1 ... 4N
     }
   }
-  if(dim_==3){
+  if(directions_ == 6){
     for (i=0; i < noParticles_; i++ ){
       tmp += jumpRate_[i].z.r;
       partialSum_.push_back(tmp);   //index 4N+1 ... 5N
@@ -561,8 +396,28 @@ void Lattice::computePartialSum(void){
       aux::printError("jump rate cumul. sum non-monotonically increasing");
 }
 
+// ----------------------
+// JUMPRATE SPECIFIC CODE
+// ----------------------
 
-void Lattice::convertMuToParticle(const int mu, int& n, int& direction){
+
+void BaseLattice::setJumpRate(const vector<Jump>& jumpRate){
+  if ((int) jumpRate.size() == noParticles_){
+
+    // remove jumprates from previous runs but now we are quenched so
+    // not needed (I think) TODO (is this right?)
+    jumpRate_.clear();
+    jumpRate_ = jumpRate;
+
+    //Use these vectors to build the partial sum
+    computePartialSum();
+  }
+  else
+    aux::printError("number of jumprates must equal number of particles");
+}
+
+
+void BaseLattice::convertMuToParticle(const int mu, int& n, int& direction){
 
   //if no error or inconsistency...
   if (0 <= mu && mu <= (int) partialSum_.size() -1){
@@ -613,7 +468,7 @@ void Lattice::convertMuToParticle(const int mu, int& n, int& direction){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float Lattice::computeEffectiveDiffusionConst(void){
+float BaseLattice::computeEffectiveDiffusionConst(void){
   float D_eff;
 
   if(!partialSum_.empty()){
@@ -665,7 +520,7 @@ float Lattice::computeEffectiveDiffusionConst(void){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float Lattice::computeAverageDiffusionConst(void){
+float BaseLattice::computeAverageDiffusionConst(void){
   //Calculate Average:
 
   float D_av = 0;
@@ -701,7 +556,7 @@ float Lattice::computeAverageDiffusionConst(void){
 }
 
 //called from main, to print out fun/useful fact to head of data-file.
-float Lattice::computeNakazato(void){
+float BaseLattice::computeNakazato(void){
 
   float alpha;
 
@@ -732,7 +587,7 @@ float Lattice::computeNakazato(void){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float Lattice::computeErgodicity(int x_size, int y_size, int z_size){
+float BaseLattice::computeErgodicity(int squares){
   //check what the MSD should be when the system reaches equilibrium.
   //(only correct if N=1). This function has two independent parts:
   //either do it numerically or analytically.
@@ -749,6 +604,10 @@ float Lattice::computeErgodicity(int x_size, int y_size, int z_size){
   int centerX = pos_0_.x;
   int centerY = pos_0_.y;
   int centerZ = pos_0_.z;
+
+  int x_size = squares;
+  int y_size = dim_ >= 2 ? squares : 1;
+  int z_size = dim_ == 3 ? squares : 1;
 
   for (int i=0; i < x_size; i++)
     for (int j=0; j < y_size; j++)
@@ -785,7 +644,7 @@ float Lattice::computeErgodicity(int x_size, int y_size, int z_size){
 // INTERACTION SPECIFIC CODE
 // -------------------------
 
-void Lattice::interaction(int n, Particle oldPos){
+void BaseLattice::interaction(int n, Particle oldPos){
   //This is an updated version of the progInteraction.cpp I used in my
   //thesis It does the exact same thing, but now we can wrap around
   //the boundary also...
