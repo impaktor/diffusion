@@ -218,8 +218,7 @@
 
 
 - auxiliary.{h,cpp} :: Functions that reads in command line arguments
-     & flags and reads input files. Also has printError-functions, and
-     the print help-message (-h flag).
+     & flags and reads input files, and print help-message (-h flag).
 
 * Hard-coded variables:
   To not use winding number when using periodic boundary conditions,

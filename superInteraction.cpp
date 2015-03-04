@@ -65,11 +65,11 @@ void SuperInteraction::controlVacancyCheck3(int n){
   if(n < noParticles_ && 0 <= n){
     if(board_.isOccupied(pos_[n])){  //if occupied
       cout << endl << "Occupied (" << pos_[n] << ")" << endl;
-      aux::printError("Two particles on same site.");
+      throw std::string("Two particles on same site.");
     }
   }
   else
-    aux::printError("Accessing invalid particle.");
+    throw std::string("Accessing invalid particle.");
 }
 
 
@@ -307,7 +307,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
       for(size_t i = 0; i < blocking.size(); i++ ){
         for(size_t j = 0; j < cluster.size(); j++ ){
           if(cluster[j] == blocking[i])
-            aux::printError("Same particle in both vectors!",__LINE__);
+            throw std::string("Same particle in both vectors!");
         }
       }
 
@@ -320,7 +320,7 @@ void SuperInteraction::superInteractionCode(int n, int direction){
         //no double occupancies, accept move, uppdate vacancy-matrix:
 
         if(blocking.size() != 0)
-          aux::printError("Blocking-vector should have zero length.");
+          throw std::string("Blocking-vector should have zero length.");
 
         for(size_t i = 0; i < cluster.size(); i++){
           int c = cluster[i];
@@ -528,7 +528,7 @@ void SuperInteraction::calculateExtent(vector<int>& cluster,int direction,
     break;
 
   case 2: //perpendicular to Z
-    aux::printError("Move perpendicular to Z, error in 2D!");
+    throw std::string("Move perpendicular to Z, error in 2D!");
     //this code is not yet operational in 3D! --> abort!
 
     Max = 1;
@@ -669,7 +669,7 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
   for(size_t i=0; i < BuildBlockingVector.size(); i++ ){
     for(size_t j=0; j < Cluster.size(); j++ ){
       if(Cluster[j] == BuildBlockingVector[i])
-        aux::printError("Same particle in both vectors!");
+        throw std::string("Same particle in both vectors!");
     }
   }
 
@@ -681,7 +681,7 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
   assert(board_.checkOK());
 
   if(dim_ == 3)
-    aux::printError("BuildBlockingCluster does not work in 3D (yet)");
+    throw std::string("BuildBlockingCluster does not work in 3D (yet)");
 
   //if we added a particle to the vector, run again to check its neighbors
   bool CheckAgain;
@@ -760,7 +760,8 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
           }
         }
         if( direction == 4 || direction == 5){ //Move in Z
-          aux::printError("I'm in 2D!", __FILE__, __LINE__);
+          throw std::string("I'm in 2D!");
+          //throw std::string("I'm in 2D!", __FILE__, __LINE__);
           //this code is not fully functional in 3D....
         }
 
@@ -818,7 +819,7 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
 
     //TEST:
     if(unique.size() > BuildBlockingVector.size() )
-      aux::printError("Something wrong in unique[].", __FILE__, __LINE__);
+      throw std::string("Something wrong in unique[].");
 
     BuildBlockingVector = unique;
 
@@ -846,7 +847,7 @@ void SuperInteraction::buildBlockingCluster(vector<int>& BuildBlockingVector,
   for(size_t i = 0; i < BuildBlockingVector.size(); i++ ){
     for(size_t j = 0; j < Cluster.size(); j++ ){
       if(Cluster[j]==BuildBlockingVector[i])
-        aux::printError("Same particle in both vectors (err. location: 2)");
+        throw std::string("Same particle in both vectors (err. location: 2)");
     }
   }
 
@@ -927,7 +928,7 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
   //TEST
   for(int i = 0; i < noParticles_; i++){
     if(pos_[i].x == 0 || pos_[i].y == 0 || pos_[i].z == 0)
-      aux::printError("Outside the lattice!");
+      throw std::string("Outside the lattice!");
   }
 
   //TEST---------(To check for double counting)
@@ -939,7 +940,7 @@ void SuperInteraction::buildCluster2(int n, vector<int>& BuildClusterVector,
     }
   }
   if(!IsUniqueTrue)
-    aux::printError("Unique is not unique!", __FILE__, __LINE__);
+    throw std::string("Unique is not unique!");
   //-------------
 }
 
@@ -1061,7 +1062,7 @@ void SuperInteraction::move(){
     //TODO remove! -------------------------------------------
     //pick a particle & direction based on jump-rate, and move.
     if(partialSum_.empty())
-      aux::printError("Partial-sum vector has not been initiated");
+      throw std::string("Partial-sum vector has not been initiated");
 
     double r2;                          //store random number here
 

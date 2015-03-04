@@ -346,7 +346,7 @@ void computeJumpRates(vector<Jump>& hopRate, float& info, const int N,
         cout << "Invalid value/choice for prob.distribution ("<< n <<")"
              << endl;
       else
-        printError("Random number for jumprate must be 0 < r < 1");
+        std::cerr << "Random number for jumprate must be 0 < r < 1" << std::endl;
     }
 
     //Manually set the jumprate of the tracer particle (first one)

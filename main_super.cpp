@@ -29,6 +29,7 @@ void computeJumpRates(std::vector<Jump>&, float&, int, float, float, float, int)
 int main(int argc, char* argv[]){
 
   InputValues def;                     //initiate default paramter values
+  try{
   aux::argumentFlags(argc, argv, def); //read in command line options
 
 
@@ -48,7 +49,7 @@ int main(int argc, char* argv[]){
   SI_Error rc = ini.LoadFile(input_file);
   if (rc < 0){
     aux::printHelp(argv);
-    aux::printError("invalid inputfile path: " + std::string(input_file));
+    throw std::string("invalid inputfile path: " + std::string(input_file));
   }
 
   //start parsing "key = value" from input-file with section "lattice"
@@ -249,6 +250,12 @@ int main(int argc, char* argv[]){
 
     if(def.isJackknife)
       save.computeJackknife(def.outputFileName);
+  }
+  catch(std::string s)
+  {
+    std::cerr << "Error: " << s << "\n";
+    return 1;
+  }
 
   return 0;
 }
@@ -310,10 +317,9 @@ void computeJumpRates(std::vector<Jump>& hopRate, float& info, int N, float jump
     }
     else{
       if (n > 3 || n <0 )
-        std::cout << "Invalid value/choice for prob.distribution ("<< n <<")"
-                  << std::endl;
+        throw std::string("Invalid value/choice for prob.distribution: " + tostring(n));
       else
-        aux::printError("Random number for jumprate must be 0 < r < 1");
+        throw std::string("Random number for jumprate must be 0 < r < 1");
     }
 
     //Manually set the jumprate of the tracer particle (first one)
