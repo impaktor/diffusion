@@ -259,6 +259,8 @@ double BaseLattice::computeWaitingTime(void){
   }
   else if(tagged_waiting_time_ == waitingtime::LIN)
     tau = 1.0 / partialSum_.back();
+  else
+    throw std::string("invalid waiting time");
 
   return tau;
 }
