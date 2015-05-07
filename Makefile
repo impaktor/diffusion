@@ -50,11 +50,14 @@ OBJECTS_SUPER  = $(SOURCES_SUPER:.cpp=.o)
 OBJECTS_MAIN   = $(SOURCES_MAIN:.cpp=.o)
 OBJECTS_EXTRA  = $(SOURCES_EXTRA:.cpp=.o)
 
+TESTS := $(patsubst %.cc, %, $(wildcard test_*.cc))
 
 ALL_FILES = $(SOURCES_SUPER) $(SOURCES_MAIN) $(SOURCES_BASIC) $(MY_HEADERS)\
 	nr/* simpleini/* Makedep.rule Makefile README.txt input.dat *.py
 
 all: $(EXECUTABLE)
+
+tests: $(TESTS)
 
 .cpp.o:
 	$(CC) $(FLAGS) -o $@ $<
@@ -93,6 +96,11 @@ lines:
 
 read_data: read_data.o save.o auxiliary.o classes.o
 	$(CC) $(LDFLAGS) read_data.o save.o classes.o auxiliary.o  -o $@
+
+test_%: test_%.o
+	$(CC) $(LDFLAGS) -o $@ $+
+
+.PHONY: all clean zip tar tags lines tests depend
 
 # Dependencies for object files
 include Makedep.rule
