@@ -73,9 +73,8 @@ void BaseLattice::place(void){
   windingNumber_0_y = 0;
   windingNumber_0_z = 0;
 
-  //assign zeros
-  Particle nil(0,0,0);
-  pos_.assign(noParticles_,nil);
+  //initially place all paricles on 0,0,0
+  pos_.assign(noParticles_, Particle(0,0,0));
 
   timeSum_ = 0;                   //Time starts at zero each run
 
@@ -83,17 +82,16 @@ void BaseLattice::place(void){
   leftToPlace--;                  //one less to place
   totalSites--;
 
-  double R;                               //store random number here
-  int i, j, k, n = 1;                     //First crowder at n = 1 element
-  for (k=1; k <= latticeZ_; k++){         //place particles
-    for (j=1; j <= latticeY_; j++){
-      for (i=1; i <= latticeX_; i++){
+  int i, j, k, n = 1;                                //First crowder at n = 1 element
+  for (k=1; k <= latticeZ_ && leftToPlace; k++){     //place particles
+    for (j=1; j <= latticeY_ && leftToPlace; j++){   //checking leftToPlace is
+      for (i=1; i <= latticeX_ && leftToPlace; i++){ //just a micro optimization
 
         //don't place crowders on the tagged particle
         if (i != pos_0_.x || j != pos_0_.y || k != pos_0_.z){
 
           //using NR to generate 0 < R < 1 ;
-          R = randomNumber.doub();
+          double R = randomNumber.doub();
           if (R <= leftToPlace*1.0 / totalSites){
             pos_[n].x = i;
             pos_[n].y = j;
@@ -119,38 +117,36 @@ void BaseLattice::place(void){
 // PUBLIC: SET FUNCTIONS:
 // ---------------------
 
-void BaseLattice::setSamplingTimes(const vector<double>& samplingTime,
+void BaseLattice::setSamplingTimes(const vector<double>& samplingTimes,
                                waitingtime tagged_waiting_time = waitingtime::LIN){
 
   tagged_waiting_time_ = tagged_waiting_time;
 
-  noSamplingTimes_ = (int) samplingTime.size();
-
-  if (noSamplingTimes_ < 1)
+  if (samplingTimes.empty())
     throw std::string("No sampling times set!");
 
   //check that it is monotonously increasing:
   bool isOrdered = true;
 
-  if (samplingTime[0] < 0)
+  if (samplingTimes[0] < 0)
     isOrdered = false;
 
-  for (int i = 1; i < noSamplingTimes_; i++){
-    if (samplingTime[i-1] > samplingTime[i]){
+  for (size_t i = 1; i < samplingTimes.size(); i++){
+    if (samplingTimes[i-1] > samplingTimes[i]){
       isOrdered = false;
       break;
     }
   }
 
   if (isOrdered){
-    samplingTime_ = samplingTime;
+    samplingTimes_ = samplingTimes;
 
     //assign the displacement container. I only need to do this
     // once/program run, as the values are then (re)set in move().
-    dx_.assign(noSamplingTimes_,0);
-    dy_.assign(noSamplingTimes_,0);
-    dz_.assign(noSamplingTimes_,0);
-    dr_.assign(noSamplingTimes_,0);
+    dx_.assign(samplingTimes_.size(),0);
+    dy_.assign(samplingTimes_.size(),0);
+    dz_.assign(samplingTimes_.size(),0);
+    dr_.assign(samplingTimes_.size(),0);
   }
   else
     throw std::string("Sampling times are not ordered");
@@ -272,7 +268,7 @@ void BaseLattice::move(){
   int i = 0;       //index of samplingTime-vector
   timeSum_ = 0;
 
-  while(timeSum_ < samplingTime_[noSamplingTimes_-1]){ // "-1" since we start on 0.
+  while(timeSum_ < samplingTimes_.back()){
     //The time-sampling was completely rewritten in late August 2010
     //to resolve the spaghetti that was the previous version. This
     //follows the gillespie_exclusion2.cpp-implementation closely, to
@@ -281,8 +277,8 @@ void BaseLattice::move(){
     tau = computeWaitingTime();
 
     //Save displacement if next time-step is beyond next sampling time
-    while(timeSum_ <= samplingTime_[i] &&
-          samplingTime_[i] < timeSum_ + tau  && i < noSamplingTimes_){
+    while(timeSum_ <= samplingTimes_[i] &&
+          samplingTimes_[i] < timeSum_ + tau  && i < (int) samplingTimes_.size()){
 
       //save displacement (from previous step), depends on geometry of lattice
       dr_[i] = distance(dx_[i], dy_[i], dz_[i]);
@@ -588,7 +584,7 @@ float BaseLattice::computeNakazato(void){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float BaseLattice::computeErgodicity(int squares){
+float BaseLattice::computeErgodicity(const int squares){
   //check what the MSD should be when the system reaches equilibrium.
   //(only correct if N=1). This function has two independent parts:
   //either do it numerically or analytically.
@@ -645,7 +641,7 @@ float BaseLattice::computeErgodicity(int squares){
 // INTERACTION SPECIFIC CODE
 // -------------------------
 
-void BaseLattice::interaction(int n, Particle oldPos){
+void BaseLattice::interaction(int n, const Particle &oldPos){
   //This is an updated version of the progInteraction.cpp I used in my
   //thesis It does the exact same thing, but now we can wrap around
   //the boundary also...
