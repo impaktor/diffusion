@@ -250,7 +250,12 @@ double BaseLattice::computeWaitingTime(void){
     // if 0 < alpha < 2: second mom inf. if alpha < 1, first mom inf.
     const double alpha = 0.5;
     const double a = 1;
-    tau = a * std::pow(r, -1.0/alpha);
+
+    // Used in Lloyd's paper, distribution: alpha/a * (1+tau/a)**(-1-alpha)
+    tau = a * (std::pow(r,-1.0/alpha) -1);
+
+    // these two have a pow dist cutoff at x=1.
+    //tau = a * std::pow(r, -1.0/alpha);
     //tau = a * (std::pow(r, -1.0/alpha) - 1.0); // correct version, but identical to above
   }
   else if(tagged_waiting_time_ == waitingtime::LIN)
