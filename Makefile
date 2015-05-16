@@ -11,7 +11,7 @@ ifeq ($(mode),debug)
    FLAGS = $(CFLAGS) -O0 -g3 -Wno-unknown-pragmas
 else ifeq ($(mode),profile)
    $(info COMPILING PROFILING MODE (use gprof))
-   FLAGS = $(CFLAGS) -O2 -D NDEBUG -Wno-unknown-pragmas
+   FLAGS = $(CFLAGS) -pg -O2 -D NDEBUG -Wno-unknown-pragmas
    LDFLAGS += -pg -fprofile-arcs -ftest-coverage
 else ifeq ($(mode),serial)
    $(info COMPILING SERIAL MODE)
