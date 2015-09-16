@@ -28,7 +28,7 @@ void Square::moveAndBoundaryCheck(int n, int R){
     //I need to know this, (see further down)
     bool changingWindingNumber = false;
 
-    if ( R >= 0 && R < 6 ){
+    if ( R >= 0 && R < (int) directions_ ){
       switch(R){
       case 0: pos_[n].x = pos_[n].x +1;
         if (pos_[n].x == latticeX_ +1){
@@ -91,6 +91,8 @@ void Square::moveAndBoundaryCheck(int n, int R){
           }
         }
         break;
+      default:
+        throw std::string("move in direction" + tostring(R) + "not implemented");
       }
 
       //check that the new site is vacant if not, move the particle
@@ -125,7 +127,7 @@ void Square::moveAndBoundaryCheck(int n, int R){
 
     }
     else
-      throw std::string("There is a maximum of " + tostring( 2 * dim_) +
+      throw std::string("There is a maximum of " + tostring(directions_) +
                         " positive directions to move in");
   }
   else
@@ -158,7 +160,7 @@ void Honeycomb2d::moveAndBoundaryCheck(int n, int R){
     bool changingWindingNumber_x = false;
     bool changingWindingNumber_y = false;
 
-    if ( R >= 0 && R < 6 ){
+    if ( R >= 0 && R < (int) directions_ ){
       switch(R){
       case 0: pos_[n].x = pos_[n].x +1;
         if (pos_[n].x == latticeX_ +1){
@@ -241,6 +243,8 @@ void Honeycomb2d::moveAndBoundaryCheck(int n, int R){
           }
         }
         break;
+      default:
+        throw std::string("move in direction" + tostring(R) + "not implemented");
       }
 
       //check that the new site is vacant if not, move the particle
@@ -281,7 +285,7 @@ void Honeycomb2d::moveAndBoundaryCheck(int n, int R){
 
     }
     else
-      throw std::string("There is a maximum of " + tostring( 2 * dim_) +
+      throw std::string("There is a maximum of " + tostring(directions_) +
                         " positive directions to move in");
   }
   else

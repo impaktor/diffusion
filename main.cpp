@@ -24,7 +24,7 @@
 #include "save.h"                //class to save MSD, compute errors, and print to file
 
 
-void computeJumpRates(std::vector<Jump>&, float&, int, float, float, float, int);
+void computeJumpRates(std::vector<Particle>&, int, float&, float, float, int, float);
 
 enum geometry {
   square1d = 1,
@@ -50,7 +50,6 @@ int main(int argc, char* argv[]){
 
   try{
     aux::argumentFlags(argc, argv, def); //read in command line options
-
 
     //read input *.ini-file (from command line) and set everything that
     //wasn't set from the command line:
@@ -146,13 +145,11 @@ int main(int argc, char* argv[]){
       }
     }
 
-    std::vector<Jump> jumpRates;            //returned by reference
+    // initiate vector of correct length for our particles.
+    std::vector<Particle> particles(nParticles, Particle());
+
     float info;                             //store trait of chosen distribution
     RemainingTime printToScreen(ensembles); //non-important nice-to-have simulation info
-
-    //generate jumprates for all crowding particles
-    computeJumpRates(jumpRates, info, nParticles, jumprateTracer,
-                     jumprateCrowders, seedJump, jumprateDistribution);
 
     //initiate the save-class to store, save, and print result
     //(also computes standard error and correlation estimate)
@@ -177,31 +174,36 @@ int main(int argc, char* argv[]){
         if(latticeGeometry == geometry::square1d){
           dim = 1;
           // lattices.push_back(std::make_unique<Square>(latticeSize,1,1, dim, nParticles, seed * (i+1), isBoundaryFix));
-          lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,1,1, dim,
-                                                                nParticles, seed * (i+1), isBoundaryFix)));
+          lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,1,1,
+                                                                dim, seed * (i+1), isBoundaryFix)));
         }
         else if(latticeGeometry == geometry::square2d){
           dim = 2;
-          lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,latticeSize,1, dim,
-                                                                nParticles, seed * (i+1), isBoundaryFix)));
+          lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,latticeSize,1,
+                                                                dim, seed * (i+1), isBoundaryFix)));
         }
         else if(latticeGeometry == geometry::square3d){
           dim = 3;
-          lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,latticeSize,latticeSize, dim,
-                                                                nParticles, seed * (i+1), isBoundaryFix)));
+          lattices.push_back(std::unique_ptr<Square>(new Square(latticeSize,latticeSize,latticeSize,
+                                                                dim, seed * (i+1), isBoundaryFix)));
         }
         else if(latticeGeometry == geometry::honeycomb2d){
           dim = 2;
-          lattices.push_back(std::unique_ptr<Honeycomb2d>(new Honeycomb2d(latticeSize, nParticles, seed * (i+1), isBoundaryFix)));
+          lattices.push_back(std::unique_ptr<Honeycomb2d>(new Honeycomb2d(latticeSize, seed * (i+1), isBoundaryFix)));
         }
         else
           throw std::string("Wrong lattice specified in input file"); // Note: must compile in serial to see this string
 
+        // set sampling times in lattice we just pushed back / added
         lattices.back()->setSamplingTimes(samplingTimes, waitingTime);
+
+        //set jumprates for all particles, return as reference
+        int directions = lattices.back()->getDirections();
+        computeJumpRates(particles, directions, info, jumprateCrowders, seedJump, jumprateDistribution, jumprateTracer);
 
         //Only actually needed for our "computeNakazato"-function.
         lattices.back()->setJumpNaka(jumprateCrowders, jumprateTracer);
-        lattices.back()->setJumpRate(jumpRates);
+        lattices.back()->setParticles(particles);
 
         //if use Interaction algorithm, with InteractStr
         if(def.isInteracting)
@@ -278,7 +280,7 @@ int main(int argc, char* argv[]){
           << "\t distr: " << dist[jumprateDistribution] << " (" << info
           << ")\t bound: " << bound[isBoundaryFix] << std::endl;
     print << "#D_eff: " << d_eff << "\t k_tagg: "                //line3
-          << jumpRates[0].x.r << "\t D_av: " << d_av
+          << particles[0].jumprates[0] << "\t D_av: " << d_av
           << "\t Interaction: " << onOff[def.isInteracting] << " "
           << def.interactionStrength << std::endl;
 
@@ -300,13 +302,13 @@ int main(int argc, char* argv[]){
       //files can be distinguished from the "real" simulation by them
       //ending with a number i: {0 < i < (noOutFiles - 1)}
       save.computeBootstrap(def.outputFileName, def.nOutputs,
-                            jumpRates[0].x.r, head);
+                            particles[0].jumprates[0], head);
 
     if(def.isBootknife)
       //If true, use the hybrid "bootknife" method to compute slope,
       //and error, and write to separate file: "out.dat_bootknife"
       save.computeBootknife(def.outputFileName, def.nBootknife,
-                            jumpRates[0].x.r);
+                            particles[0].jumprates[0]);
 
     if(def.isJackknife)
       save.computeJackknife(def.outputFileName);
@@ -337,11 +339,8 @@ int main(int argc, char* argv[]){
 
 
 
-void computeJumpRates(std::vector<Jump>& hopRate, float& info, int N, float jumpTracer,
-                      float jumpCrowders, float seedJump, int jumpDistribution){
-
-  //we store by hopRate.push_back() further down
-  hopRate.clear();
+void computeJumpRates(std::vector<Particle>& particles, int directions, float& info,
+                      float jumpCrowders, float seedJump, int jumpDistribution, float jumpTracer){
 
   static Ran randomHopDistribution(seedJump);   //just any seed will do
 
@@ -349,7 +348,7 @@ void computeJumpRates(std::vector<Jump>& hopRate, float& info, int N, float jump
   //just used to print info to file/screen
   info = 0;
 
-  for (int particle = 0; particle < N; particle ++){
+  for (size_t particle = 0; particle < particles.size(); particle++){
     double u;
     do {
       u = randomHopDistribution.doub();
@@ -359,7 +358,7 @@ void computeJumpRates(std::vector<Jump>& hopRate, float& info, int N, float jump
 
     //NOTE: The jumprate is in EACH direction! Meaning, jumprate =1
     //is actually a jumprate =4 in 2D. (I think)
-    if (0 <= n && n <= 3 && (u < 1 && u > 0) ){
+    if (u < 1 && u > 0){
       float lambda = 1.0;            //used in option 1 Exp-dist.
       float y_c = 1.0;               //used in option 2 Power-law
       float alpha = 0.5;             //used in option 2 Power-law
@@ -381,33 +380,19 @@ void computeJumpRates(std::vector<Jump>& hopRate, float& info, int N, float jump
         info = alpha;
         break;
       case 3:                        // 3 = nakazato distribution
-        if (particle == 0) u = jumpTracer;   //set juprate for the first
-        else u = jumpCrowders;               //set juprate for the rest
+        u = jumpCrowders;
         info = jumpTracer/jumpCrowders;
         break;
+      default:
+        throw std::string(tostring(n) + " is an invalid jump distribution");
       }
     }
-    else{
-      if (n > 3 || n <0 )
-        throw std::string("Invalid value/choice for prob.distribution ("
-                          + tostring(n) + ")");
-      else
-        throw std::string("Random number for jumprate must be 0 < r < 1");
-    }
+    else
+      throw std::string("Random number for jumprate must be 0 < r < 1");
 
-    //Manually set the jumprate of the tracer particle (first one)
-    if (particle == 0 ) u = jumpTracer;
-
-    //save jump rate u to right and left direction
-    Jump::Direction dir(u,u);
-
-    Jump jump;
-
-    //same jumprate in all dimensions (x,y,z)
-    jump.x = dir;
-    jump.y = dir;
-    jump.z = dir;
-
-    hopRate.push_back(jump);
+    particles[particle].jumprates.assign(directions, u);
   }
+
+  // tagged particle has special jump rate:
+  particles[0].jumprates.assign(directions,jumpTracer);
 }

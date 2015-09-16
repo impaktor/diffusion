@@ -5,30 +5,16 @@
 
 #include "classes.h"
 
-
-Jump::Direction::Direction(double right, double left){
-    r = right;
-    l = left;
-}
-
-Jump::Direction::Direction(const Direction &dir) : r(dir.r), l(dir.l) {
-}
-
-Jump::Direction::Direction(void) : r(0.0), l(0.0) {
-}
-
-
-
-Particle::Particle(int X, int Y,int Z){
+Particle::Particle(int X, int Y, int Z){
   x = X;
   y = Y;
   z = Z;
 
-  //Rate automagically initiated to zero by the constructor of
-  //Jump (which calls constructor of Direction which sets it to zero).
+  // default: 6 directions (3 dimensions)
+  jumprates.assign(6,1.0);
 }
 
-Particle::Particle(const Particle & p) : x(p.x), y(p.y), z(p.z), rate(p.rate) {
+Particle::Particle(const Particle & p) : x(p.x), y(p.y), z(p.z), jumprates(p.jumprates) {
 }
 
 Particle::Particle(void) : x(0), y(0), z(0) {
@@ -36,14 +22,22 @@ Particle::Particle(void) : x(0), y(0), z(0) {
 
 
 Particle & Particle::operator=(const Particle & input){
-  x = input.x;        //coordinates
+  x = input.x;                  //copy coordinates
   y = input.y;
   z = input.z;
 
-  rate = input.rate;  //jump rate
+  jumprates = input.jumprates;  //copy jump rates
 
   return *this;
 }
+
+void Particle::setPos(int X, int Y, int Z){
+  x = X;
+  y = Y;
+  z = Z;
+}
+
+
 
 
 //overloading the << operator for the Particle class.

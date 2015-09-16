@@ -5,7 +5,7 @@
 
 #include "nr/ran_mod.h"    //need this for the Ran-class below.
 #include "auxiliary.h"     //non-physics stuff. (print messages etc.)
-#include "classes.h"       //various data structures /classes (Jump, Particle)
+#include "classes.h"       //various data structures /classes (Particle)
 #include <functional>      // for std::function
 
 using std::vector;
@@ -32,9 +32,8 @@ public:
 
     //set all sites at vacant i.e. value = -1. A site with a
     //particle will have that particles label as value. [0 -- (N-1)]
-
     vacancy_.assign(x_dim_+1, vector<vector<int> >
-                    (y_dim_+1, vector<int>(z_dim_+1,-1)));  // very heavy to do!
+                    (y_dim_+1, vector<int>(z_dim_+1,-1)));
 
     // Matrix starts at coord: (1,1,1) the 0-elements of the matrix
     //have no meaning, since our lattice starts at 1,..,x_dim_
@@ -44,7 +43,7 @@ public:
 
   //check if vacant, return true or false (or label id of occupying
   //particle?)
-  bool isVacant(const Particle &p) const{
+  bool isVacant(Particle p) const{
     if(vacancy_[p.x][p.y][p.z] == -1)
       return true;
     else
@@ -56,7 +55,7 @@ public:
     return isVacant(Particle(x,y,z));
   }
 
-  bool isOccupied(const Particle &p) const{
+  bool isOccupied(Particle p) const{
     return !(isVacant(p));
   }
 
@@ -64,7 +63,7 @@ public:
     return !(isVacant(x, y, z));
   }
 
-  int get_label(const Particle &p) const{
+  int get_label(Particle p) const{
     return vacancy_[p.x][p.y][p.z];
   }
 
@@ -73,11 +72,11 @@ public:
   }
 
   //set site as occupied by particle with index id.
-  void setAsOccupied(const Particle &p, int id){
+  void setAsOccupied(Particle p, int id){
     vacancy_[p.x][p.y][p.z] = id;
   }
 
-  void setAsVacant(const Particle &p){
+  void setAsVacant(Particle p){
     setAsOccupied(p, -1);
   }
 
@@ -117,7 +116,7 @@ public:
   }
 
 
-  void checkNeighbours(const Particle &particle, vector<int> &neighbours, bool isBoundaryFix){
+  void checkNeighbours(Particle particle, vector<int>& neighbours, bool isBoundaryFix){
     //Only needed if using some kind of interactions.  Return a vector
     //of labels of all neighbors to "particle". If "particle" is
     //alone, the vector will be empty.
@@ -179,16 +178,18 @@ public:
 class BaseLattice{
 public:
   BaseLattice(int x, int y, int z, int dimension,
-              int particleNumber, double seed, bool boundaryFix);
+              double seed, bool boundaryFix);
 
   void place(void);                        //Place particles on the lattice
   void move(void);                         //pick a particle & direction based on jump-rate
 
-  int getDimension(void) const;
+  unsigned int getDimension(void) const;
+  unsigned int getDirections(void) const;
   void getDisplacement(vector<int>&, vector<int>&,
                        vector<int>&, vector<double>&) const;
   void setSamplingTimes(const vector<double>&, waitingtime);
   void setInteraction(float);             //determine if we use the interaction-algorithm
+  void setParticles(const vector<Particle>&); //add particles to lattice
   void setJumpNaka(float, float);
   void setDist(int, double);
 
@@ -196,9 +197,6 @@ public:
   float computeErgodicity(int);            //Calculate the theoretical MSD when ergodic
   float computeAverageDiffusionConst(void);
   float computeEffectiveDiffusionConst(void);
-
-  //Set jump-rate of each particle and direction
-  void setJumpRate(const vector<Jump>&);
 
 
 protected:
@@ -208,14 +206,17 @@ protected:
 
   float interactionStrength_;              //only used if "InteractionOn=true"
 
+  struct dir{                              // center of lattice, starting pos for tagged particle
+    int x, y, z;
+  } center_;
+
   vector<Particle> pos_;                   //XYZ-position for each particle on the lattice
-  Particle pos_0_;                         //Initial position for the tagged particle
   int noParticles_;                        //Total number of particles
   int latticeX_, latticeY_, latticeZ_;     //Lattice size
 
-  vector<double> samplingTimes_;            //times to compute the MSD.
+  vector<double> samplingTime_;            //times to compute the MSD.
+  int noSamplingTimes_;                    //number of times to sample
 
-  vector<Jump> jumpRate_;                  //jump-rate for each particle and direction
   vector <long double> partialSum_;        //cumulative sum of jump-rates
 
   unsigned int dim_;                       //dimension of lattice (=1 || 2 || 3)
@@ -250,7 +251,7 @@ protected:
 
 protected:                                  //not shared with suerInteraction
   bool isInteractionOn_;                    //use the interaction algorithm
-  void interaction(int, const Particle&);
+  void interaction(int, Particle);
 };
 
 #endif

@@ -22,12 +22,9 @@ const bool TEST_1            = false;
 // =====================
 
 BaseLattice::BaseLattice(int x, int y, int z, int dimension,
-                         int particleNumber, double seed, bool boundaryFix)
+                         double seed, bool boundaryFix)
   //initiate the random number generator with "seed" just given above
   : randomNumber(seed), board_(x, y, z){
-
-  if (particleNumber >= x*y*z)
-    throw std::string("Number of particles must be <= number of squares");
 
   dim_ = dimension;
   directions_ = dim_ * 2;
@@ -37,18 +34,11 @@ BaseLattice::BaseLattice(int x, int y, int z, int dimension,
   latticeY_ = dim_ >= 2 ? y : 1;
   latticeZ_ = dim_ == 3 ? z : 1;
 
-  noParticles_ = particleNumber;
-
   isBoundaryFix_ = boundaryFix;
 
-  //place tagged particle at lattice center
-  pos_0_.x = round(1.0*latticeX_/2);
-  pos_0_.y = round(1.0*latticeY_/2);
-  pos_0_.z = round(1.0*latticeZ_/2);
-
-  windingNumber_0_x = 0;
-  windingNumber_0_y = 0;
-  windingNumber_0_z = 0;
+  center_.x = round(latticeX_/2.0);
+  center_.y = round(latticeY_/2.0);
+  center_.z = round(latticeZ_/2.0);
 
   //Hardcoded Switches:
   //------------------
@@ -65,33 +55,35 @@ void BaseLattice::place(void){
   //This function will be called once each ensemble to
   //place the N particles (randomly), and reset the time
 
-  int totalSites = latticeX_ * latticeY_ * latticeZ_;
-  int leftToPlace = noParticles_;
+  timeSum_ = 0;                   //Time starts at zero each run
+
+  if(pos_.size() < 1)
+    throw std::string("No particles to place");
 
   //reset this counter:
   windingNumber_0_x = 0;
   windingNumber_0_y = 0;
   windingNumber_0_z = 0;
 
-  //initially place all paricles on 0,0,0
-  pos_.assign(noParticles_, Particle(0,0,0));
+  int totalSites = latticeX_ * latticeY_ * latticeZ_;
+  int leftToPlace = noParticles_;
 
-  timeSum_ = 0;                   //Time starts at zero each run
-
-  pos_[0] = pos_0_;               //place tracer particle at center
+  //place tagged particle at lattice center
+  pos_[0].setPos(center_.x, center_.y, center_.z);
   leftToPlace--;                  //one less to place
   totalSites--;
 
-  int i, j, k, n = 1;                                //First crowder at n = 1 element
-  for (k=1; k <= latticeZ_ && leftToPlace; k++){     //place particles
-    for (j=1; j <= latticeY_ && leftToPlace; j++){   //checking leftToPlace is
-      for (i=1; i <= latticeX_ && leftToPlace; i++){ //just a micro optimization
+  double R;                               //store random number here
+  int i, j, k, n = 1;                     //First crowder at n = 1 element
+  for (k=1; k <= latticeZ_; k++){         //place particles
+    for (j=1; j <= latticeY_; j++){
+      for (i=1; i <= latticeX_; i++){
 
         //don't place crowders on the tagged particle
-        if (i != pos_0_.x || j != pos_0_.y || k != pos_0_.z){
+        if (i != pos_[0].x || j != pos_[0].y || k != pos_[0].z){
 
           //using NR to generate 0 < R < 1 ;
-          double R = randomNumber.doub();
+          R = randomNumber.doub();
           if (R <= leftToPlace*1.0 / totalSites){
             pos_[n].x = i;
             pos_[n].y = j;
@@ -117,36 +109,38 @@ void BaseLattice::place(void){
 // PUBLIC: SET FUNCTIONS:
 // ---------------------
 
-void BaseLattice::setSamplingTimes(const vector<double>& samplingTimes,
+void BaseLattice::setSamplingTimes(const vector<double>& samplingTime,
                                waitingtime tagged_waiting_time = waitingtime::LIN){
 
   tagged_waiting_time_ = tagged_waiting_time;
 
-  if (samplingTimes.empty())
+  noSamplingTimes_ = (int) samplingTime.size();
+
+  if (noSamplingTimes_ < 1)
     throw std::string("No sampling times set!");
 
   //check that it is monotonously increasing:
   bool isOrdered = true;
 
-  if (samplingTimes[0] < 0)
+  if (samplingTime[0] < 0)
     isOrdered = false;
 
-  for (size_t i = 1; i < samplingTimes.size(); i++){
-    if (samplingTimes[i-1] > samplingTimes[i]){
+  for (int i = 1; i < noSamplingTimes_; i++){
+    if (samplingTime[i-1] > samplingTime[i]){
       isOrdered = false;
       break;
     }
   }
 
   if (isOrdered){
-    samplingTimes_ = samplingTimes;
+    samplingTime_ = samplingTime;
 
     //assign the displacement container. I only need to do this
     // once/program run, as the values are then (re)set in move().
-    dx_.assign(samplingTimes_.size(),0);
-    dy_.assign(samplingTimes_.size(),0);
-    dz_.assign(samplingTimes_.size(),0);
-    dr_.assign(samplingTimes_.size(),0);
+    dx_.assign(noSamplingTimes_,0);
+    dy_.assign(noSamplingTimes_,0);
+    dz_.assign(noSamplingTimes_,0);
+    dr_.assign(noSamplingTimes_,0);
   }
   else
     throw std::string("Sampling times are not ordered");
@@ -154,9 +148,20 @@ void BaseLattice::setSamplingTimes(const vector<double>& samplingTimes,
 
 
 void BaseLattice::setJumpNaka(const float jumpCrowders,
-                          const float jumpTracer){
+                              const float jumpTracer){
   jumpCrowders_ = jumpCrowders;
   jumpTracer_ = jumpTracer;
+}
+
+void BaseLattice::setParticles(const vector<Particle>& particles){
+  if(particles.size() == 0)
+    throw std::string("received vector of 0 particles");
+
+  noParticles_ = particles.size();
+  pos_ = particles;
+
+  //Use these vectors to build the partial sum
+  computePartialSum();
 }
 
 void BaseLattice::setInteraction(const float interactionStrength){
@@ -170,10 +175,13 @@ void BaseLattice::setInteraction(const float interactionStrength){
 // ---------------------
 
 //could be useful to have, but not necessary...
-int BaseLattice::getDimension(void) const{
+unsigned int BaseLattice::getDimension(void) const{
   return dim_;
 }
 
+unsigned int BaseLattice::getDirections(void) const{
+  return directions_;
+}
 
 void BaseLattice::getDisplacement(vector<int>& dx, vector<int>& dy,
                               vector<int>& dz, vector<double>& dr) const{
@@ -250,18 +258,11 @@ double BaseLattice::computeWaitingTime(void){
     // if 0 < alpha < 2: second mom inf. if alpha < 1, first mom inf.
     const double alpha = 0.5;
     const double a = 1;
-
-    // Used in Lloyd's paper, distribution: alpha/a * (1+tau/a)**(-1-alpha)
-    tau = a * (std::pow(r,-1.0/alpha) -1);
-
-    // these two have a pow dist cutoff at x=1.
-    //tau = a * std::pow(r, -1.0/alpha);
+    tau = a * std::pow(r, -1.0/alpha);
     //tau = a * (std::pow(r, -1.0/alpha) - 1.0); // correct version, but identical to above
   }
   else if(tagged_waiting_time_ == waitingtime::LIN)
     tau = 1.0 / partialSum_.back();
-  else
-    throw std::string("invalid waiting time");
 
   return tau;
 }
@@ -273,7 +274,7 @@ void BaseLattice::move(){
   int i = 0;       //index of samplingTime-vector
   timeSum_ = 0;
 
-  while(timeSum_ < samplingTimes_.back()){
+  while(timeSum_ < samplingTime_[noSamplingTimes_-1]){ // "-1" since we start on 0.
     //The time-sampling was completely rewritten in late August 2010
     //to resolve the spaghetti that was the previous version. This
     //follows the gillespie_exclusion2.cpp-implementation closely, to
@@ -282,8 +283,8 @@ void BaseLattice::move(){
     tau = computeWaitingTime();
 
     //Save displacement if next time-step is beyond next sampling time
-    while(timeSum_ <= samplingTimes_[i] &&
-          samplingTimes_[i] < timeSum_ + tau  && i < (int) samplingTimes_.size()){
+    while(timeSum_ <= samplingTime_[i] &&
+          samplingTime_[i] < timeSum_ + tau  && i < noSamplingTimes_){
 
       //save displacement (from previous step), depends on geometry of lattice
       dr_[i] = distance(dx_[i], dy_[i], dz_[i]);
@@ -350,7 +351,6 @@ void BaseLattice::move(){
 
 void BaseLattice::computePartialSum(){
   long double tmp = 0;
-  int i;
 
   // delete previous run
   partialSum_.clear();
@@ -358,44 +358,19 @@ void BaseLattice::computePartialSum(){
   // first element must be zero
   partialSum_.push_back(tmp);
 
-  //check the jump-rate-vectors
-  if ((int) jumpRate_.size() != noParticles_)
-    throw std::string("number of jumprates, != N");
+  if ((int) pos_.size() != noParticles_)
+    throw std::string("number of particles, != N");
 
   //build partialSum-vector
-  if(directions_ >= 2){
-    for(i=0; i < noParticles_ ; i++){
-      tmp += jumpRate_[i].x.r;
-      partialSum_.push_back(tmp);  //index 1 ... N
-    }
-    for (i=0; i < noParticles_ ; i++){
-      tmp += jumpRate_[i].x.l;
-      partialSum_.push_back(tmp);  //index N+1 ... 2N
-    }
-  }
-  if (directions_ >= 4 ){
-    for (i=0; i < noParticles_; i++ ){
-      tmp += jumpRate_[i].y.r;
-      partialSum_.push_back(tmp);   //index 2N+1 ... 3N
-    }
-    for (i=0; i < noParticles_; i++ ){
-      tmp += jumpRate_[i].y.l;
-      partialSum_.push_back(tmp);   //index 3N+1 ... 4N
-    }
-  }
-  if(directions_ == 6){
-    for (i=0; i < noParticles_; i++ ){
-      tmp += jumpRate_[i].z.r;
-      partialSum_.push_back(tmp);   //index 4N+1 ... 5N
-    }
-    for (i=0; i < noParticles_; i++ ){
-      tmp += jumpRate_[i].z.l;
-      partialSum_.push_back(tmp);   //index 5N+1 ... 6N
+  for(size_t j = 0; j < pos_[0].jumprates.size(); ++j){
+    for(size_t i = 0; i < pos_.size(); ++i){
+      tmp += pos_[i].jumprates[j];
+      partialSum_.push_back(tmp);
     }
   }
 
   //check for errors: It must increase monotonically:
-  for (int i = 1; i < noParticles_; i++)
+  for (size_t i = 1; i < pos_.size(); i++)
     if (partialSum_[i] < partialSum_[i-1])
       throw std::string("jump rate cumul. sum non-monotonically increasing");
 }
@@ -404,21 +379,6 @@ void BaseLattice::computePartialSum(){
 // JUMPRATE SPECIFIC CODE
 // ----------------------
 
-
-void BaseLattice::setJumpRate(const vector<Jump>& jumpRate){
-  if ((int) jumpRate.size() == noParticles_){
-
-    // remove jumprates from previous runs but now we are quenched so
-    // not needed (I think) TODO (is this right?)
-    jumpRate_.clear();
-    jumpRate_ = jumpRate;
-
-    //Use these vectors to build the partial sum
-    computePartialSum();
-  }
-  else
-    throw std::string("number of jumprates must equal number of particles");
-}
 
 
 void BaseLattice::convertMuToParticle(const int mu, int& n, int& direction){
@@ -479,24 +439,9 @@ float BaseLattice::computeEffectiveDiffusionConst(void){
     //D_i=k_i * pow(a,2)
     double sum_temp = 0;
 
-    if (dim_ >= 1){
-      for (int i=0; i < noParticles_; i++){
-        sum_temp += 1.0/jumpRate_[i].x.r;
-        sum_temp += 1.0/jumpRate_[i].x.l;
-      }
-    }
-
-    if (dim_ >= 2){
-      for (int i=0; i < noParticles_; i++){
-        sum_temp += 1.0/jumpRate_[i].y.r;
-        sum_temp += 1.0/jumpRate_[i].y.l;
-      }
-    }
-
-    if (dim_ == 3){
-      for (int i=0; i < noParticles_; i++){
-        sum_temp += 1.0/jumpRate_[i].z.r;
-        sum_temp += 1.0/jumpRate_[i].z.l;
+    for(size_t j = 0; j < pos_[0].jumprates.size(); ++j){
+      for(size_t i=0; i < pos_.size(); i++){
+        sum_temp += 1.0/pos_[i].jumprates[j];
       }
     }
 
@@ -530,20 +475,9 @@ float BaseLattice::computeAverageDiffusionConst(void){
   if(!partialSum_.empty()){
 
     int startingParticle = 1;  //don't include the tagged
-    for (int i = startingParticle; i < noParticles_; i++){
-      D_av += jumpRate_[i].x.r;
-      D_av += jumpRate_[i].x.l;
-    }
-    if(dim_ > 1){
-      for (int i = startingParticle; i < noParticles_; i++){
-        D_av += jumpRate_[i].y.r;
-        D_av += jumpRate_[i].y.l;
-      }
-    }
-    if (dim_>2){
-      for (int i = startingParticle; i < noParticles_; i++){
-        D_av += jumpRate_[i].z.r;
-        D_av += jumpRate_[i].z.l;
+    for(size_t j = 0; j < pos_[0].jumprates.size(); ++j){
+      for(size_t i = startingParticle; i < pos_.size(); i++){
+        D_av += pos_[i].jumprates[j];
       }
     }
     D_av = D_av * 1.0/(noParticles_ * 2 * dim_);
@@ -589,7 +523,7 @@ float BaseLattice::computeNakazato(void){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float BaseLattice::computeErgodicity(const int squares){
+float BaseLattice::computeErgodicity(int squares){
   //check what the MSD should be when the system reaches equilibrium.
   //(only correct if N=1). This function has two independent parts:
   //either do it numerically or analytically.
@@ -599,13 +533,6 @@ float BaseLattice::computeErgodicity(const int squares){
   //use these to "walk" through the lattice to measure the MSD
   //contribution from each square
   int x, y, z;
-
-  //STEP THROUGH THE LATTICE
-  //I re-map the starting coordinates, in case I'd
-  //like to move this function out from this class...
-  int centerX = pos_0_.x;
-  int centerY = pos_0_.y;
-  int centerZ = pos_0_.z;
 
   int x_size = squares;
   int y_size = dim_ >= 2 ? squares : 1;
@@ -617,7 +544,7 @@ float BaseLattice::computeErgodicity(const int squares){
         x = i + 1;               //First square has coord.(1,1,1)
         y = j + 1;
         z = k + 1;
-        sum += pow(centerX-x,2)+pow(centerY-y,2)+pow(centerZ-z,2);
+        sum += pow(center_.x-x,2)+pow(center_.y-y,2)+pow(center_.z-z,2);
       }
   sum = (float) sum / (x_size*y_size*z_size);
 
@@ -626,7 +553,7 @@ float BaseLattice::computeErgodicity(const int squares){
   //<R^2>, when the system becomes ergodic.
   bool testAnalytic = false;
   if (testAnalytic){
-    int a = centerX, b = centerY, c = centerZ;
+    int a = center_.x, b = center_.y, c = center_.z;
     float xContrib = ((x_size + 1) * (2 * x_size + 1) *
                            1.0/6 - a * (x_size+1) + a * a);
     float yContrib = ((y_size + 1) * (2 * y_size + 1) *
@@ -646,7 +573,7 @@ float BaseLattice::computeErgodicity(const int squares){
 // INTERACTION SPECIFIC CODE
 // -------------------------
 
-void BaseLattice::interaction(int n, const Particle &oldPos){
+void BaseLattice::interaction(int n, Particle oldPos){
   //This is an updated version of the progInteraction.cpp I used in my
   //thesis It does the exact same thing, but now we can wrap around
   //the boundary also...

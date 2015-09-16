@@ -2,6 +2,7 @@
 #define CLASSES_H
 
 #include <time.h>
+#include <vector>
 
 enum waitingtime {
   LIN = 0,
@@ -19,27 +20,6 @@ inline std::ostream & operator<<(std::ostream & str, waitingtime wt){
   }
 }
 
-//First three classes (Direction, Jump, Particle), will allow us to
-//get the position of a Particle object as: object.x, and the jump
-//rate as object.rate.x.r etc.
-
-class Jump{
-public:
-  class Direction{
-  public:
-    Direction(double right, double left);
-    Direction(const Direction&);            //copy constructor
-    Direction(void);                        //empty constructor
-    double r;  //right
-    double l;  //left
-  };
-
-  // Jump(double xr, double xl, double yr, double yl, double zr, double zl) :
-  //   x(xr,xl), y(yr,yl), z(zr,zl){ }
-  Direction x; //i.e. x.r and x.l
-  Direction y;
-  Direction z;
-};
 
 class Particle{
 public:
@@ -50,14 +30,14 @@ public:
   int y;
   int z;
 
+  std::vector<double> jumprates;          //one element for each direction
+
   //keep track of how many laps it's made around the lattice
   //for periodic boundary condition. (only use this (temporary?) in
   //Lattice::moveAndBoundaryCheck and Lattice::move)
   // int windingNumber_x;    //can take both neg. and pos. numbers.
   // int windingNumber_y;
   // int windingNumber_z;
-
-  Jump rate;        //jump rate: rate.x.r
 
   //This allows us to print x,y,z with the << operator
   //like: Particle particle(1,4,2);  cout << particle <<endl;
@@ -67,6 +47,7 @@ public:
   //assignment operator:
   Particle & operator=(const Particle &);
 
+  void setPos(int, int, int);
 };
 
 
