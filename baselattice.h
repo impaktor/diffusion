@@ -193,10 +193,10 @@ public:
   void setJumpNaka(float, float);
   void setDist(int, double);
 
-  float computeNakazato(void);
-  float computeErgodicity(int);            //Calculate the theoretical MSD when ergodic
-  float computeAverageDiffusionConst(void);
-  float computeEffectiveDiffusionConst(void);
+  float computeNakazato(void) const;
+  float computeErgodicity(int) const;      //Calculate the theoretical MSD when ergodic
+  float computeAverageDiffusionConst(void) const;
+  float computeEffectiveDiffusionConst(void) const;
 
 
 protected:
@@ -211,7 +211,7 @@ protected:
   } center_;
 
   vector<Particle> pos_;                   //XYZ-position for each particle on the lattice
-  int noParticles_;                        //Total number of particles
+  size_t noParticles_;                     //Total number of particles
   int latticeX_, latticeY_, latticeZ_;     //Lattice size
 
   vector<double> samplingTime_;            //times to compute the MSD.
@@ -227,18 +227,18 @@ protected:
   vector<int> dx_,dy_,dz_;                 //pos. of tracer particle for current ensemble
   vector<double> dr_;                      //pos. of tracer particle for current ensemble
 
-  //count number of laps around the lattice (if periodic boundary):
-  int windingNumber_0_x;
-  int windingNumber_0_y;
-  int windingNumber_0_z;
+  // keep tracking the x,y,z of the tagged particle that can be bigger than the lattice
+  int true_x;
+  int true_y;
+  int true_z;
 
-  void convertMuToParticle(int, int&, int&);
+  void convertMuToParticle(size_t, size_t&, size_t&) const;
   void computePartialSum();                // used to find direction to move in
 
-  virtual void moveAndBoundaryCheck(int,int) = 0;
+  virtual void moveAndBoundaryCheck(size_t, size_t) = 0;
   virtual double distance(int &dx, int &dy, int &dz) = 0;
 
-  int vacancyCheck(int, const Particle&);
+  bool vacancyCheck(size_t, const Particle&);
 
   float jumpCrowders_, jumpTracer_;        //only used in the Nakazato()-function
   bool isTestOn_;                          //To print detailed information to screen

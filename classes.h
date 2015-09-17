@@ -32,13 +32,6 @@ public:
 
   std::vector<double> jumprates;          //one element for each direction
 
-  //keep track of how many laps it's made around the lattice
-  //for periodic boundary condition. (only use this (temporary?) in
-  //Lattice::moveAndBoundaryCheck and Lattice::move)
-  // int windingNumber_x;    //can take both neg. and pos. numbers.
-  // int windingNumber_y;
-  // int windingNumber_z;
-
   //This allows us to print x,y,z with the << operator
   //like: Particle particle(1,4,2);  cout << particle <<endl;
   friend std::ostream& operator<< (std::ostream &out, Particle &particle);

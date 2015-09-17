@@ -3,6 +3,8 @@
 #include <cmath>           //gives sqrt, pow, fabs,
 #include <functional>      // for std::function
 #include <vector>
+#include <cassert>
+
 
 #include "auxiliary.h"     //for tostring() function
 #include "classes.h"       //various data structures /classes (Jump, Particle)
@@ -60,11 +62,6 @@ void BaseLattice::place(void){
   if(pos_.size() < 1)
     throw std::string("No particles to place");
 
-  //reset this counter:
-  windingNumber_0_x = 0;
-  windingNumber_0_y = 0;
-  windingNumber_0_z = 0;
-
   int totalSites = latticeX_ * latticeY_ * latticeZ_;
   int leftToPlace = noParticles_;
 
@@ -72,6 +69,10 @@ void BaseLattice::place(void){
   pos_[0].setPos(center_.x, center_.y, center_.z);
   leftToPlace--;                  //one less to place
   totalSites--;
+
+  true_x = pos_[0].x;
+  true_y = pos_[0].y;
+  true_z = pos_[0].z;
 
   double R;                               //store random number here
   int i, j, k, n = 1;                     //First crowder at n = 1 element
@@ -195,17 +196,17 @@ void BaseLattice::getDisplacement(vector<int>& dx, vector<int>& dy,
 
 
 //check if site is vacant or not
-int BaseLattice::vacancyCheck(int n, const Particle& oldPos){
-  int returnvalue = 0;   //unused parameter to register collisions
+bool BaseLattice::vacancyCheck(size_t n, const Particle& oldPos){
+  bool collides = false;
 
-  if (n > noParticles_ || 0 > n)
+  if (n > noParticles_)
     throw std::string("accessing invalid particle");
 
   if (board_.isOccupied(pos_[n])){ //if occupied
     if (isTestOn_)
       std::cout << "\033[91mOccupied:\033[0m " << pos_[n] << "\n";
     pos_[n] = oldPos;                                 //then move back
-    returnvalue = 1;
+    collides = true;
   }
   else{
     //if no interaction att all:
@@ -227,11 +228,7 @@ int BaseLattice::vacancyCheck(int n, const Particle& oldPos){
     std::cout << "now particle: "<< n << " is at pos: "
               << pos_[n] << "\n" << std::endl;
 
-  return returnvalue;
-  //(the return value could be used to have a
-  //    do-move-while(vacancyCheck == 1)
-  //but if so, we need to move this function to be directly in the
-  //Move_()-func.)
+  return collides;
 }
 
 
@@ -334,8 +331,10 @@ void BaseLattice::move(){
       }
     }while(loopAgain);
 
-    int mu = mu_guess;
-    int n,r;
+    assert(mu_guess >= 0);
+
+    size_t mu = mu_guess;
+    size_t n,r;
 
     //transforms the index mu to which particle to move (n) and in
     //which direction (r, 0<= r <= 5 (in 3D))
@@ -358,7 +357,7 @@ void BaseLattice::computePartialSum(){
   // first element must be zero
   partialSum_.push_back(tmp);
 
-  if ((int) pos_.size() != noParticles_)
+  if (pos_.size() != noParticles_)
     throw std::string("number of particles, != N");
 
   //build partialSum-vector
@@ -381,13 +380,13 @@ void BaseLattice::computePartialSum(){
 
 
 
-void BaseLattice::convertMuToParticle(const int mu, int& n, int& direction){
+void BaseLattice::convertMuToParticle(size_t mu, size_t& n, size_t& direction) const{
 
   //if no error or inconsistency...
-  if (0 <= mu && mu <= (int) partialSum_.size() -1){
+  if (mu <= partialSum_.size() -1){
     //... then start checking the intervals:
 
-    if ( 0 <= mu && mu <= 2 * noParticles_ - 1 ){
+    if (mu <= 2 * noParticles_ - 1 ){
       if ( mu <= noParticles_ - 1 ){
         n = mu;
         direction = 0;
@@ -399,7 +398,7 @@ void BaseLattice::convertMuToParticle(const int mu, int& n, int& direction){
       }
     }
     else{
-      if ( 2 * noParticles_ <= mu && mu <= 4 * noParticles_ - 1){
+      if (2 * noParticles_ <= mu && mu <= 4 * noParticles_ - 1){
         if ( mu <= 3 * noParticles_-1){
           n = mu - 2 * noParticles_;
           direction = 2;
@@ -430,7 +429,7 @@ void BaseLattice::convertMuToParticle(const int mu, int& n, int& direction){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float BaseLattice::computeEffectiveDiffusionConst(void){
+float BaseLattice::computeEffectiveDiffusionConst(void) const {
   float D_eff;
 
   if(!partialSum_.empty()){
@@ -467,7 +466,7 @@ float BaseLattice::computeEffectiveDiffusionConst(void){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float BaseLattice::computeAverageDiffusionConst(void){
+float BaseLattice::computeAverageDiffusionConst(void) const{
   //Calculate Average:
 
   float D_av = 0;
@@ -492,7 +491,7 @@ float BaseLattice::computeAverageDiffusionConst(void){
 }
 
 //called from main, to print out fun/useful fact to head of data-file.
-float BaseLattice::computeNakazato(void){
+float BaseLattice::computeNakazato(void) const{
 
   float alpha;
 
@@ -523,7 +522,7 @@ float BaseLattice::computeNakazato(void){
 
 
 //called from main, to print out fun/useful fact to head of data-file.
-float BaseLattice::computeErgodicity(int squares){
+float BaseLattice::computeErgodicity(int squares) const{
   //check what the MSD should be when the system reaches equilibrium.
   //(only correct if N=1). This function has two independent parts:
   //either do it numerically or analytically.
