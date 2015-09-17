@@ -65,6 +65,9 @@ void BaseLattice::place(void){
   int totalSites = latticeX_ * latticeY_ * latticeZ_;
   int leftToPlace = noParticles_;
 
+  if(totalSites < leftToPlace)
+    throw std::string("Too many particels for such a small lattice");
+
   //place tagged particle at lattice center
   pos_[0].setPos(center_.x, center_.y, center_.z);
   leftToPlace--;                  //one less to place
@@ -199,7 +202,7 @@ void BaseLattice::getDisplacement(vector<int>& dx, vector<int>& dy,
 bool BaseLattice::vacancyCheck(size_t n, const Particle& oldPos){
   bool collides = false;
 
-  if (n > noParticles_)
+  if (n > noParticles_ -1)
     throw std::string("accessing invalid particle");
 
   if (board_.isOccupied(pos_[n])){ //if occupied
@@ -383,48 +386,26 @@ void BaseLattice::computePartialSum(){
 void BaseLattice::convertMuToParticle(size_t mu, size_t& n, size_t& direction) const{
 
   //if no error or inconsistency...
-  if (mu <= partialSum_.size() -1){
-    //... then start checking the intervals:
+  if (mu > partialSum_.size() -1)
+    throw std::string("mu = " + tostring(mu) + " or partialSum_= " +
+                      tostring(partialSum_.size()) + " not correct");
 
-    if (mu <= 2 * noParticles_ - 1 ){
-      if ( mu <= noParticles_ - 1 ){
-        n = mu;
-        direction = 0;
+  //... then start checking the intervals:
+  for(size_t dir = 0; dir < directions_; dir = dir + 2){
+    if (dir * noParticles_ <= mu && mu <= (2+dir) * noParticles_ -1){
+      if (mu <= (1+dir) * noParticles_ - 1){
+        n = mu - dir * noParticles_;
+        direction = dir;
       }
-      //if ( noParticles_ <= mu){
       else{
-        n = mu - noParticles_;
-        direction = 1;
-      }
-    }
-    else{
-      if (2 * noParticles_ <= mu && mu <= 4 * noParticles_ - 1){
-        if ( mu <= 3 * noParticles_-1){
-          n = mu - 2 * noParticles_;
-          direction = 2;
-        }
-        //if ( 3 * noParticles_ <= mu ){
-        else{
-          n = mu - 3 * noParticles_;
-          direction = 3;
-        }
-      }//if ( 4 * noParticles_ <= mu && mu <= 6 * noParticles_ - 1){
-      else{
-        if ( mu <= 5 * noParticles_ - 1){
-          n = mu -4 * noParticles_;
-          direction = 4;
-        }
-        //if ( 5 * noParticles_ <= mu ){
-        else{
-          n = mu -5 * noParticles_;
-          direction = 5;
-        }
+        n = mu - (1+dir) * noParticles_;
+        direction = 1+dir;
       }
     }
   }
-  else
-    throw std::string("mu=" + tostring(mu) + "or partialSum_=" +
-                      tostring(partialSum_.size()) + "not correct");
+
+  assert(direction < directions_); // because direction starts on 0
+  assert(n < noParticles_);        // ...as does particle index n
 }
 
 

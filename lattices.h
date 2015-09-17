@@ -51,4 +51,57 @@ public:
   void moveAndBoundaryCheck(size_t n, size_t R);
 };
 
+
+class BCC: public BaseLattice{
+public:
+
+  BCC(int squares, double seed, bool boundaryFix)
+    //initiate the class by calling the base class
+    : BaseLattice(squares, squares, squares, 3, seed, boundaryFix)
+  {
+    directions_ = 8;  // a 3D Body-centered cubic lattice, with x,y,z coordinates, but has 8 directions
+  }
+
+  // how to compute the distance on a lattice from three coordinates
+  double distance(int &dx, int &dy, int &dz){
+
+    dx = true_x - center_.x;
+    dy = true_y - center_.y;
+    dz = true_z - center_.z;
+
+    return 0.5*sqrt(pow(  dx + dy - dz, 2) +
+                    pow(  dx - dy + dz, 2) +
+                    pow(- dx + dy + dz, 2));
+  }
+
+  void moveAndBoundaryCheck(size_t n, size_t R);
+};
+
+
+class FCC: public BaseLattice{
+public:
+
+  FCC(int squares, double seed, bool boundaryFix)
+    //initiate the class by calling the base class
+    : BaseLattice(squares, squares, squares, 3, seed, boundaryFix)
+  {
+    directions_ = 12;  // a 3D Face-centered cubic lattice, with x,y,z coordinates, but has 12 directions
+  }
+
+  // how to compute the distance on a lattice from three coordinates
+  double distance(int &dx, int &dy, int &dz){
+
+    dx = true_x - center_.x;
+    dy = true_y - center_.y;
+    dz = true_z - center_.z;
+
+    return 0.5*sqrt(pow(dx + dy, 2) +
+                    pow(dx + dz, 2) +
+                    pow(dy + dz, 2));
+  }
+
+  void moveAndBoundaryCheck(size_t n, size_t R);
+};
+
+
 #endif

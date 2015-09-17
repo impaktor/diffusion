@@ -43,19 +43,15 @@ public:
 
   //check if vacant, return true or false (or label id of occupying
   //particle?)
-  bool isVacant(Particle p) const{
-    if(vacancy_[p.x][p.y][p.z] == -1)
-      return true;
-    else
-      return false;
+  bool isVacant(const Particle &p) const{
+    return (vacancy_[p.x][p.y][p.z] == -1);
   }
-
 
   bool isVacant(int x, int y, int z) const{
     return isVacant(Particle(x,y,z));
   }
 
-  bool isOccupied(Particle p) const{
+  bool isOccupied(const Particle &p) const{
     return !(isVacant(p));
   }
 
@@ -63,7 +59,7 @@ public:
     return !(isVacant(x, y, z));
   }
 
-  int get_label(Particle p) const{
+  int get_label(const Particle &p) const{
     return vacancy_[p.x][p.y][p.z];
   }
 

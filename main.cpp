@@ -31,6 +31,8 @@ enum geometry {
   square2d,
   square3d,
   honeycomb2d,
+  bcc,
+  fcc,
 };
 
 // Just to print info to output file.
@@ -190,6 +192,14 @@ int main(int argc, char* argv[]){
         else if(latticeGeometry == geometry::honeycomb2d){
           dim = 2;
           lattices.push_back(std::unique_ptr<Honeycomb2d>(new Honeycomb2d(latticeSize, seed * (i+1), isBoundaryFix)));
+        }
+        else if(latticeGeometry == geometry::bcc){
+          dim = 3;
+          lattices.push_back(std::unique_ptr<BCC>(new BCC(latticeSize, seed * (i+1), isBoundaryFix)));
+        }
+        else if(latticeGeometry == geometry::fcc){
+          dim = 3;
+          lattices.push_back(std::unique_ptr<FCC>(new FCC(latticeSize, seed * (i+1), isBoundaryFix)));
         }
         else
           throw std::string("Wrong lattice specified in input file"); // Note: must compile in serial to see this string
