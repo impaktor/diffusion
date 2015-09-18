@@ -85,7 +85,7 @@ tar:
 	tar -vzcf prog.tar.gz $(ALL_FILES)
 
 zip:
-	zip prog.zip $(ALL_FILES)
+	zip prog.zip $(ALL_FILES) input.ini
 
 #For Emacs-lovers
 tags:
