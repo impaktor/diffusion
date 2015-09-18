@@ -368,37 +368,36 @@ void computeJumpRates(std::vector<Particle>& particles, int directions, float& i
 
     //NOTE: The jumprate is in EACH direction! Meaning, jumprate =1
     //is actually a jumprate =4 in 2D. (I think)
-    if (u < 1 && u > 0){
-      float lambda = 1.0;            //used in option 1 Exp-dist.
-      float y_c = 1.0;               //used in option 2 Power-law
-      float alpha = 0.5;             //used in option 2 Power-law
-
-      switch(n){
-      case 0:                        // 0 = uniform distribution
-        u = u;
-        info = 1.0;                  //Max value for uniform random number
-        break;
-      case 1:                        // 1 = exponential distribution
-        u = (-log(u)) / lambda;
-        u = 1.0/u;
-        info = lambda;
-        break;
-      case 2:                        // 2 = power law distribution
-        // p(y) = alpha/y_c * (y/y_c)^{-1-alfa} if y > y_c, || 0
-        u = y_c * pow(u,-1/alpha);
-        u = 1.0/u;                   //convert friction coeff. to jump rate
-        info = alpha;
-        break;
-      case 3:                        // 3 = nakazato distribution
-        u = jumpCrowders;
-        info = jumpTracer/jumpCrowders;
-        break;
-      default:
-        throw std::string(tostring(n) + " is an invalid jump distribution");
-      }
-    }
-    else
+    if (u >= 1 || u <= 0)
       throw std::string("Random number for jumprate must be 0 < r < 1");
+
+    float lambda = 1.0;            //used in option 1 Exp-dist.
+    float y_c = 1.0;               //used in option 2 Power-law
+    float alpha = 0.5;             //used in option 2 Power-law
+
+    switch(n){
+    case 0:                        // 0 = uniform distribution
+      u = u;
+      info = 1.0;                  //Max value for uniform random number
+      break;
+    case 1:                        // 1 = exponential distribution
+      u = (-log(u)) / lambda;
+      u = 1.0/u;
+      info = lambda;
+      break;
+    case 2:                        // 2 = power law distribution
+      // p(y) = alpha/y_c * (y/y_c)^{-1-alfa} if y > y_c, || 0
+      u = y_c * pow(u,-1/alpha);
+      u = 1.0/u;                   //convert friction coeff. to jump rate
+      info = alpha;
+      break;
+    case 3:                        // 3 = nakazato distribution
+      u = jumpCrowders;
+      info = jumpTracer/jumpCrowders;
+      break;
+    default:
+      throw std::string(tostring(n) + " is an invalid jump distribution");
+    }
 
     particles[particle].jumprates.assign(directions, u);
   }

@@ -136,18 +136,18 @@ void BaseLattice::setSamplingTimes(const vector<double>& samplingTime,
     }
   }
 
-  if (isOrdered){
-    samplingTime_ = samplingTime;
-
-    //assign the displacement container. I only need to do this
-    // once/program run, as the values are then (re)set in move().
-    dx_.assign(noSamplingTimes_,0);
-    dy_.assign(noSamplingTimes_,0);
-    dz_.assign(noSamplingTimes_,0);
-    dr_.assign(noSamplingTimes_,0);
-  }
-  else
+  if (!isOrdered)
     throw std::string("Sampling times are not ordered");
+
+  samplingTime_ = samplingTime;
+
+  //assign the displacement container. I only need to do this
+  // once/program run, as the values are then (re)set in move().
+  dx_.assign(noSamplingTimes_,0);
+  dy_.assign(noSamplingTimes_,0);
+  dz_.assign(noSamplingTimes_,0);
+  dr_.assign(noSamplingTimes_,0);
+
 }
 
 
