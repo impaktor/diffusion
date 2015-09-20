@@ -29,7 +29,6 @@ BaseLattice::BaseLattice(int x, int y, int z, int dimension,
   : randomNumber(seed), board_(x, y, z){
 
   dim_ = dimension;
-  directions_ = dim_ * 2;
 
   //number of lattice sites
   latticeX_ = x;
@@ -143,11 +142,7 @@ void BaseLattice::setSamplingTimes(const vector<double>& samplingTime,
 
   //assign the displacement container. I only need to do this
   // once/program run, as the values are then (re)set in move().
-  dx_.assign(noSamplingTimes_,0);
-  dy_.assign(noSamplingTimes_,0);
-  dz_.assign(noSamplingTimes_,0);
   dr_.assign(noSamplingTimes_,0);
-
 }
 
 
@@ -178,22 +173,20 @@ void BaseLattice::setInteraction(const float interactionStrength){
 // PUBLIC: GET FUNCTIONS:
 // ---------------------
 
-//could be useful to have, but not necessary...
-unsigned int BaseLattice::getDimension(void) const{
-  return dim_;
-}
-
 unsigned int BaseLattice::getDirections(void) const{
   return directions_;
 }
 
 void BaseLattice::getDisplacement(vector<int>& dx, vector<int>& dy,
-                              vector<int>& dz, vector<double>& dr) const{
+                                  vector<int>& dz, vector<double>& dr) const{
   //Get the displacement of the tracer particle
   //from the current "ensemble"
-  dx = dx_;
-  dy = dy_;
-  dz = dz_;
+
+  // DUMMY, do not use them!
+  dx.assign(dr_.size(),0);
+  dy.assign(dr_.size(),0);
+  dz.assign(dr_.size(),0);
+
   dr = dr_;
 }
 
@@ -287,7 +280,7 @@ void BaseLattice::move(){
           samplingTime_[i] < timeSum_ + tau  && i < noSamplingTimes_){
 
       //save displacement (from previous step), depends on geometry of lattice
-      dr_[i] = distance(dx_[i], dy_[i], dz_[i]);
+      dr_[i] = distance();
 
       i++;
     }
@@ -298,7 +291,7 @@ void BaseLattice::move(){
     int mu_left = 0;
     int mu_right = directions_ * noParticles_;
     double p_left = (double) partialSum_.front(); //value in first element (=0)
-    double p_right = (double) partialSum_.back(); //value in last element (=dim_*2*N)
+    double p_right = (double) partialSum_.back(); //value in last element
 
     do{
       r2 = randomNumber.doub();

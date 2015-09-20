@@ -19,10 +19,10 @@ public:
   // coordinates in pos_[0], and the starting position in center_. Just
   // for reference, we return the displacement in x,y,z as references
   // as well, but the important one is the return of the distance "dr".
-  double distance(int &dx, int &dy, int &dz){
-    dx = true_x - center_.x;
-    dy = true_y - center_.y;
-    dz = true_z - center_.z;
+  double distance(){
+    int dx = true_x - center_.x;
+    int dy = true_y - center_.y;
+    int dz = true_z - center_.z;
     return sqrt(pow(dx,2) + pow(dy,2) + pow(dz,2));
   }
 
@@ -41,10 +41,9 @@ public:
   }
 
   // how to compute the distance on a lattice from three coordinates
-  double distance(int &dx, int &dy, int &dz){
-    dx = true_x - center_.x;
-    dy = true_y - center_.y;
-    dz = 0;
+  double distance(){
+    int dx = true_x - center_.x;
+    int dy = true_y - center_.y;
     return sqrt(pow(dx + 0.5*dy, 2) + 3.0/4.0*pow(dy, 2));
   }
 
@@ -63,11 +62,11 @@ public:
   }
 
   // how to compute the distance on a lattice from three coordinates
-  double distance(int &dx, int &dy, int &dz){
+  double distance(){
 
-    dx = true_x - center_.x;
-    dy = true_y - center_.y;
-    dz = true_z - center_.z;
+    int dx = true_x - center_.x;
+    int dy = true_y - center_.y;
+    int dz = true_z - center_.z;
 
     return 0.5*sqrt(pow(  dx + dy - dz, 2) +
                     pow(  dx - dy + dz, 2) +
@@ -89,11 +88,11 @@ public:
   }
 
   // how to compute the distance on a lattice from three coordinates
-  double distance(int &dx, int &dy, int &dz){
+  double distance(){
 
-    dx = true_x - center_.x;
-    dy = true_y - center_.y;
-    dz = true_z - center_.z;
+    int dx = true_x - center_.x;
+    int dy = true_y - center_.y;
+    int dz = true_z - center_.z;
 
     return 0.5*sqrt(pow(dx + dy, 2) +
                     pow(dx + dz, 2) +

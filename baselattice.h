@@ -179,9 +179,8 @@ public:
   void place(void);                        //Place particles on the lattice
   void move(void);                         //pick a particle & direction based on jump-rate
 
-  unsigned int getDimension(void) const;
   unsigned int getDirections(void) const;
-  void getDisplacement(vector<int>&, vector<int>&,
+  void getDisplacement(vector<int>&,vector<int>&,
                        vector<int>&, vector<double>&) const;
   void setSamplingTimes(const vector<double>&, waitingtime);
   void setInteraction(float);             //determine if we use the interaction-algorithm
@@ -220,8 +219,7 @@ protected:
   bool isBoundaryFix_;                     //"true" if fix, "false" if periodic
   double timeSum_;                         //Sum of time for each move
 
-  vector<int> dx_,dy_,dz_;                 //pos. of tracer particle for current ensemble
-  vector<double> dr_;                      //pos. of tracer particle for current ensemble
+  vector<double> dr_;                      //displacement of tracerparticle
 
   // keep tracking the x,y,z of the tagged particle that can be bigger than the lattice
   int true_x;
@@ -232,7 +230,7 @@ protected:
   void computePartialSum();                // used to find direction to move in
 
   virtual void moveAndBoundaryCheck(size_t, size_t) = 0;
-  virtual double distance(int &dx, int &dy, int &dz) = 0;
+  virtual double distance() = 0;
 
   bool vacancyCheck(size_t, const Particle&);
 
