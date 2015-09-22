@@ -33,14 +33,14 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
   //Store in case we want to restore the previous configuration
   Particle old = pos_[n];
 
+  // Move particle n on the lattice:
   switch(R){
   case 0:
     pos_[n].x = pos_[n].x +1;      // jump right in lattice system
 
     if(pos_[n].x == latticeX_ +1){ // if jumping outside the lattice:
       isOutside = true;            // if fix boundary, reset particle (later)
-      if(!isBoundaryFix_)
-        pos_[n].x = 1;             // if periodic boundary, just warp around lattice
+      if(!isBoundaryFix_) pos_[n].x = 1; // if periodic boundary, warp around lattice
     }
     break;
   case 1:
@@ -48,8 +48,7 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].x == 0){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].x = latticeX_;
+      if(!isBoundaryFix_) pos_[n].x = latticeX_;
     }
     break;
   case 2:
@@ -57,8 +56,7 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].y == latticeY_ +1){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].y = 1;
+      if(!isBoundaryFix_) pos_[n].y = 1;
     }
     break;
   case 3:
@@ -66,8 +64,7 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].y == 0){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].y = latticeY_;
+      if(!isBoundaryFix_) pos_[n].y = latticeY_;
     }
     break;
   case 4:
@@ -75,8 +72,7 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].z == latticeZ_ +1){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].z = 1;
+      if(!isBoundaryFix_) pos_[n].z = 1;
     }
     break;
   case 5:
@@ -84,8 +80,7 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].z == 0){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].z = latticeZ_;
+      if(!isBoundaryFix_) pos_[n].z = latticeZ_;
     }
     break;
   default:
@@ -99,8 +94,10 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
   //back. (done by the vacancyCheck...)
   bool collided = vacancyCheck(n,old);
 
-  //Also update the tagged partilce in its second, "infinite" coordinate system
-  if (n == 0 && !collided && (!isBoundaryFix_ || !isOutside)){
+  //If n is tagged particle, then also move it in its second,
+  //"infinite" coordinate system, - if it didn't collied with any
+  //particle on our lattice above.
+  if (n == 0 && !collided && !(isBoundaryFix_ && isOutside)){
     switch(R) {
     case 0:
       true_x++;
@@ -120,6 +117,8 @@ void Square::moveAndBoundaryCheck(size_t n, size_t R){
     case 5:
       true_z--;
       break;
+    default:
+      throw std::string("move in direction" + tostring(R) + "not implemented");
     }
   }
 }
@@ -152,14 +151,14 @@ void Honeycomb2d::moveAndBoundaryCheck(size_t n, size_t R){
   //Store in case we want to restore the previous configuration
   Particle old = pos_[n];
 
+    // Move particle n on the lattice:
   switch(R){
   case 0:
     pos_[n].x = pos_[n].x +1;
 
     if(pos_[n].x == latticeX_ +1){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].x = 1;
+      if(!isBoundaryFix_) pos_[n].x = 1;
     }
     break;
   case 1:
@@ -167,8 +166,7 @@ void Honeycomb2d::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].x == 0){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].x = latticeX_;
+      if(!isBoundaryFix_) pos_[n].x = latticeX_;
     }
     break;
   case 2:
@@ -176,8 +174,7 @@ void Honeycomb2d::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].y == latticeY_ +1){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].y = 1;
+      if(!isBoundaryFix_) pos_[n].y = 1;
     }
     break;
   case 3:
@@ -185,8 +182,7 @@ void Honeycomb2d::moveAndBoundaryCheck(size_t n, size_t R){
 
     if(pos_[n].y == 0){
       isOutside = true;
-      if(!isBoundaryFix_)
-        pos_[n].y = latticeY_;
+      if(!isBoundaryFix_) pos_[n].y = latticeY_;
     }
     break;
   case 4:
@@ -224,8 +220,10 @@ void Honeycomb2d::moveAndBoundaryCheck(size_t n, size_t R){
   //back. (done by the vacancyCheck...)
   bool collided = vacancyCheck(n,old);
 
-  //Also update the tagged partilce in its second, "infinite" coordinate system
-  if (n == 0 && !collided && (!isBoundaryFix_ || !isOutside)){
+  //If n is tagged particle, then also move it in its second,
+  //"infinite" coordinate system, - if it didn't collied with any
+  //particle on our lattice above.
+  if (n == 0 && !collided && !(isBoundaryFix_ && isOutside)){
     switch(R) {
     case 0:
       true_x++;
@@ -247,6 +245,8 @@ void Honeycomb2d::moveAndBoundaryCheck(size_t n, size_t R){
       true_x++;
       true_y--;
       break;
+    default:
+      throw std::string("move in direction" + tostring(R) + "not implemented");
     }
   }
 }
@@ -276,6 +276,7 @@ void BCC::moveAndBoundaryCheck(size_t n, size_t R){
   //Store in case we want to restore the previous configuration
   Particle old = pos_[n];
 
+  // Move particle n on the lattice:
   switch(R){
   case 0:
     pos_[n].x = pos_[n].x +1;
@@ -400,8 +401,10 @@ void BCC::moveAndBoundaryCheck(size_t n, size_t R){
   //back. (done by the vacancyCheck...)
   bool collided = vacancyCheck(n,old);
 
-  //Also update the tagged partilce in its second, "infinite" coordinate system
-  if (n == 0 && !collided && (!isBoundaryFix_ || !isOutside)){
+  //If n is tagged particle, then also move it in its second,
+  //"infinite" coordinate system, - if it didn't collied with any
+  //particle on our lattice above.
+  if (n == 0 && !collided && !(isBoundaryFix_ && isOutside)){
     switch(R) {
     case 0:
       true_x++;
@@ -432,15 +435,19 @@ void BCC::moveAndBoundaryCheck(size_t n, size_t R){
       true_x--;
       true_y++;
       true_z--;
+      break;
     case 6:
       true_x--;
       true_y--;
       true_z++;
+      break;
     case 7:
       true_x--;
       true_y--;
       true_z--;
       break;
+    default:
+      throw std::string("move in direction" + tostring(R) + "not implemented");
     }
   }
 }
@@ -469,6 +476,7 @@ void FCC::moveAndBoundaryCheck(size_t n, size_t R){
   //Store in case we want to restore the previous configuration
   Particle old = pos_[n];
 
+  // Move particle n on the lattice:
   switch(R){
   case 0:
     pos_[n].x = pos_[n].x +1;
@@ -637,8 +645,10 @@ void FCC::moveAndBoundaryCheck(size_t n, size_t R){
   //back. (done by the vacancyCheck...)
   bool collided = vacancyCheck(n,old);
 
-  //Also update the tagged partilce in its second, "infinite" coordinate system
-  if (n == 0 && !collided && (!isBoundaryFix_ || !isOutside)){
+  //If n is tagged particle, then also move it in its second,
+  //"infinite" coordinate system, - if it didn't collied with any
+  //particle on our lattice above.
+  if (n == 0 && !collided && !(isBoundaryFix_ && isOutside)){
     switch(R) {
     case 0:
       true_x++;
@@ -663,25 +673,33 @@ void FCC::moveAndBoundaryCheck(size_t n, size_t R){
     case 5:
       true_x++;
       true_z--;
+      break;
     case 6:
       true_x--;
       true_z++;
+      break;
     case 7:
       true_x--;
       true_z--;
+      break;
     case 8:
       true_y++;
       true_z++;
+      break;
     case 9:
       true_y++;
       true_z--;
+      break;
     case 10:
       true_y--;
       true_z++;
+      break;
     case 11:
       true_y--;
       true_z--;
       break;
+    default:
+      throw std::string("move in direction" + tostring(R) + "not implemented");
     }
   }
 }

@@ -13,6 +13,7 @@ public:
     //initiate the class by calling the base class
     : BaseLattice(x,y,z, dimension, seed, boundaryFix)
   {
+    directions_ = 2 * dimension;
   }
 
   // how to compute the distance on a lattice from the three new
