@@ -38,21 +38,19 @@ endif
 
 ########################### END #######################################
 
-MY_HEADERS = classes.h auxiliary.h baselattice.h lattices.h save.h superInteraction.h
+MY_HEADERS = classes.h auxiliary.h baselattice.h lattices.h save.h
 
 SOURCES_BASIC  = baselattice.cpp lattices.cpp classes.cpp auxiliary.cpp save.cpp
-SOURCES_SUPER  = superInteraction.cpp main_super.cpp
 SOURCES_MAIN   = main.cpp
 SOURCES_EXTRA  = read_data.cpp
 
 OBJECTS_BASIC  = $(SOURCES_BASIC:.cpp=.o)
-OBJECTS_SUPER  = $(SOURCES_SUPER:.cpp=.o)
 OBJECTS_MAIN   = $(SOURCES_MAIN:.cpp=.o)
 OBJECTS_EXTRA  = $(SOURCES_EXTRA:.cpp=.o)
 
 TESTS := $(patsubst %.cc, %, $(wildcard test_*.cc))
 
-ALL_FILES = $(SOURCES_SUPER) $(SOURCES_MAIN) $(SOURCES_BASIC) $(MY_HEADERS)\
+ALL_FILES = $(SOURCES_MAIN) $(SOURCES_BASIC) $(MY_HEADERS)\
 	nr/* simpleini/* Makedep.rule Makefile README.txt input.dat *.py
 
 all: $(EXECUTABLE)
@@ -62,11 +60,8 @@ tests: $(TESTS)
 .cpp.o:
 	$(CC) $(FLAGS) -o $@ $<
 
-super: $(OBJECTS_BASIC) $(OBJECTS_SUPER)
-	$(CC) $(LDFLAGS) -o $@ $+
-
 depend:
-	$(CC) $(FLAGS) -MM $(SOURCES_BASIC) $(SOURCES_SUPER) $(SOURCES_MAIN) $(SOURCES_EXTRA) >Makedep.rule
+	$(CC) $(FLAGS) -MM $(SOURCES_BASIC) $(SOURCES_MAIN) $(SOURCES_EXTRA) >Makedep.rule
 
 Makedep.rule: Makefile
 	@echo "The makefile has changed since the last 'make depend'."
@@ -78,7 +73,7 @@ $(EXECUTABLE): $(OBJECTS_BASIC) $(OBJECTS_MAIN)
 clean:
 	touch -d20020101 Makedep.rule
 	make depend
-	\rm -vf $(OBJECTS_MAIN) $(OBJECTS_BASIC) $(OBJECTS_SUPER) $(EXECUTABLE) $(OBJECTS_EXTRA) super read_data
+	\rm -vf $(OBJECTS_MAIN) $(OBJECTS_BASIC) $(EXECUTABLE) $(OBJECTS_EXTRA) read_data
 
 #use gz:
 tar:
