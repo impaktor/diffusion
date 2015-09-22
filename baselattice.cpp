@@ -177,15 +177,9 @@ unsigned int BaseLattice::getDirections(void) const{
   return directions_;
 }
 
-void BaseLattice::getDisplacement(vector<int>& dx, vector<int>& dy,
-                                  vector<int>& dz, vector<double>& dr) const{
+void BaseLattice::getDisplacement(vector<double>& dr) const{
   //Get the displacement of the tracer particle
   //from the current "ensemble"
-
-  // DUMMY, do not use them!
-  dx.assign(dr_.size(),0);
-  dy.assign(dr_.size(),0);
-  dz.assign(dr_.size(),0);
 
   dr = dr_;
 }

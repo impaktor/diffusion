@@ -22,9 +22,8 @@ public:
   Save(vectorD_t samplingTimeVector, int noEnsembles, bool lowMem);
 
   //Each run/trajectory/"ensemble" should be saved by calling this
-  //function. dx..dz is displacement from starting position.
-  void store(const vectorI_t& dx, const vectorI_t& dy,
-             const vectorI_t& dz, const vectorD_t& dr);
+  //function. dr is displacement from starting position.
+  void store(const vectorD_t& dr);
 
   //After simulation is complete, call this to print an output-file by
   //name "fileName" with structure:
@@ -66,13 +65,13 @@ public:
 private:
 
   //average of displacement (MSD) squared: <X^2>, <Y^2>,...
-  vectorD_t x2_mu_, y2_mu_, z2_mu_, r2_mu_;
+  vectorD_t r2_mu_;
 
   //Store std error, in each point
-  vectorD_t x2_err_, y2_err_ ,z2_err_ ,r2_err_;
+  vectorD_t r2_err_;
 
   //needed if we use stdErrLowMem()
-  vectorD_t dr4_err_, dx4_err_, dy4_err_, dz4_err_;
+  vectorD_t dr4_err_;
 
   //Switch between the two stdErr-functions above.
   bool isLowMem_;
@@ -85,9 +84,6 @@ private:
   vectorD_t z_correlation_;
 
   //save position for each ensemble and store them all
-  matrixI_t store_dx_;
-  matrixI_t store_dy_;
-  matrixI_t store_dz_;
   matrixD_t store_dr2_;
 
   //Number of trajectories/simulation realizations.
@@ -119,7 +115,8 @@ private:
   void computePearsonCoefficient();
 
   void computeHmatrix(const matrixD_t&, matrixD_t&);
-  void computeHmatrix2(matrixD_t&, bool);
+  //void computeHmatrix2(matrixD_t&, bool);
+  void computeHmatrix2(matrixD_t&);
   void computeHmatrix3(matrixD_t& , std::string, bool, bool);
   void computeBmatrix(const matrixI_t&, matrixD_t&, bool);
 

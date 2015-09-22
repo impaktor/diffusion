@@ -231,16 +231,12 @@ int main(int argc, char* argv[]){
 
         //Store tracer position at each point for this "ensembles", to
         //compute standard error/deviation, etc.
-        std::vector<int> dx,dy,dz;
         std::vector<double> dr;
 
         if (def.isBruteForce){              //only use one data point from each trajectory
 
-          dx.reserve(samplingTimes.size()); //make room, for speed
-          dy.reserve(samplingTimes.size());
-          dz.reserve(samplingTimes.size());
           dr.reserve(samplingTimes.size());
-          assert(dx.size() == 0);           //since using push back in for loop
+          assert(dr.size() == 0);           //since using push back in for loop
 
           for(size_t k = 0; k < samplingTimes.size(); ++k) {
 
@@ -250,25 +246,21 @@ int main(int argc, char* argv[]){
             lattices[lattice_index]->place();
             lattices[lattice_index]->move();
 
-            std::vector<int> dx_sub,dy_sub,dz_sub; //save subset of x, y, z, data
             std::vector<double> dr_sub;
-            lattices[lattice_index]->getDisplacement(dx_sub, dy_sub, dz_sub, dr_sub);
+            lattices[lattice_index]->getDisplacement(dr_sub);
 
-            dx.push_back(dx_sub.back());           //only store/use last element
-            dy.push_back(dy_sub.back());
-            dz.push_back(dz_sub.back());
             dr.push_back(dr_sub.back());
           }
         }
         else{
           lattices[lattice_index]->place();
           lattices[lattice_index]->move();
-          lattices[lattice_index]->getDisplacement(dx, dy, dz, dr);
+          lattices[lattice_index]->getDisplacement(dr);
         }
 
 #       pragma omp critical  //only one thread may write at a time:
         {
-          save.store(dx,dy,dz,dr);
+          save.store(dr);
         }
       }
     }

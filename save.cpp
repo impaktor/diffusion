@@ -68,21 +68,12 @@ Save::Save(vectorD_t samplingTime,
   //only needed if we use the memory-conserving algorithm
   if(isLowMem_){
     dr4_err_.assign(noSamplingTimes_, 0);
-    dx4_err_.assign(noSamplingTimes_, 0);
-    dy4_err_.assign(noSamplingTimes_, 0);
-    dz4_err_.assign(noSamplingTimes_, 0);
 
     r2_mu_.assign(noSamplingTimes_, 0);
-    x2_mu_.assign(noSamplingTimes_, 0);
-    y2_mu_.assign(noSamplingTimes_, 0);
-    z2_mu_.assign(noSamplingTimes_, 0);
   }
   else{
     //Allocate size in memory for the matrix to store every
     //individual trajectory, will use push_back later, so don't "assign()"
-    store_dx_.reserve(noEnsembles_);
-    store_dy_.reserve(noEnsembles_);
-    store_dz_.reserve(noEnsembles_);
     store_dr2_.reserve(noEnsembles_);
   }
 }
@@ -195,8 +186,7 @@ void Save::computeZ(std::string filename){
 }
 
 
-void Save::store(const vectorI_t& dx, const vectorI_t& dy,
-                 const vectorI_t& dz, const vectorD_t& dr){
+void Save::store(const vectorD_t& dr){
   //This function stores all the trajectories, so we can process the data,
   //like error bars in computeStdErr().
 
@@ -217,11 +207,9 @@ void Save::store(const vectorI_t& dx, const vectorI_t& dy,
 
   if(isLowMem_){
     //Check that we assigned the vectors, (non-empty):
-    assert(!dr4_err_.empty() && !dx4_err_.empty() &&
-           !dy4_err_.empty() && !dz4_err_.empty());
+    assert(!dr4_err_.empty());
 
-    assert(!r2_mu_.empty() && !x2_mu_.empty() &&
-           !y2_mu_.empty() && !z2_mu_.empty());
+    assert(!r2_mu_.empty());
 
     //To conserve memory we do the summation directly, which might
     //cause a numerical error in the end compared to doing it the
@@ -229,23 +217,11 @@ void Save::store(const vectorI_t& dx, const vectorI_t& dy,
     //output
     for(int i = 0; i < noSamplingTimes_; i++){
       dr4_err_[i] += pow( dr[i] ,4);  //NOTE: this only works for square lattice!
-      dx4_err_[i] += pow( dx[i] ,4);
-      dy4_err_[i] += pow( dy[i] ,4);
-      dz4_err_[i] += pow( dz[i] ,4);
 
       r2_mu_[i] += pow( dr[i] ,2);
-      x2_mu_[i] += pow( dx[i] ,2);
-      y2_mu_[i] += pow( dy[i] ,2);
-      z2_mu_[i] += pow( dz[i] ,2);
     }
   }
   else{
-    //if we don't use the lowMem-algorithm:
-    //this gives dx[ensembles][number of values]
-    store_dx_.push_back(dx);
-    store_dy_.push_back(dy);
-    store_dz_.push_back(dz);
-
     //store displacement squared.
     //NOTE; Pigeon says the dr being fed into store from read_data.cpp might be wrong
     vectorD_t tmp(dr.size(),0);
@@ -263,18 +239,12 @@ void Save::save(std::string name, std::string head){
   if(isLowMem_){
     //use the memory conserving version instead. This one does not
     //use the dx[][]-matrix, and in that way we save lots of mem.
-    computeStdErrLowMem(x2_mu_, x2_err_, dx4_err_);
-    computeStdErrLowMem(y2_mu_, y2_err_, dy4_err_);
-    computeStdErrLowMem(z2_mu_, z2_err_, dz4_err_);
     computeStdErrLowMem(r2_mu_, r2_err_, dr4_err_);
 
   }
   else{
 
     //Compute <R^2>:
-    computeMean<int>(store_dx_, x2_mu_, 2); //"2" = square trajectory
-    computeMean<int>(store_dy_, y2_mu_, 2); //"2" = square trajectory
-    computeMean<int>(store_dz_, z2_mu_, 2); //"2" = square trajectory
     computeMean<double>(store_dr2_, r2_mu_);
 
     //Calculate standard error, to generate error-bars this function
@@ -369,28 +339,19 @@ void Save::computeStdErr(void){
   //Should not be using this function if lowMem = true!
   assert(!isLowMem_);
 
-  x2_err_.assign(noSamplingTimes_, 0);
-  y2_err_.assign(noSamplingTimes_, 0);
-  z2_err_.assign(noSamplingTimes_, 0);
   r2_err_.assign(noSamplingTimes_, 0);
 
   //Optimization: avoid a[i] / b, use: c = 1/b; a[i] * c;
   double tmp = 1.0 / (1.0*noEnsembles_*(noEnsembles_ - 1));
 
-  assert(x2_mu_.size() == (size_t) noSamplingTimes_);
-  assert(store_dx_.size() == (size_t) noEnsembles_);
+  assert(r2_mu_.size() == (size_t) noSamplingTimes_);
+  assert(store_dr_.size() == (size_t) noEnsembles_);
 
 # pragma omp parallel for
   for(int i = 0; i < noSamplingTimes_; i++){
     for(int m = 0; m < noEnsembles_; m++){
-      x2_err_[i] += pow (pow(store_dx_[m][i],2) - x2_mu_[i] ,2);
-      y2_err_[i] += pow (pow(store_dy_[m][i],2) - y2_mu_[i] ,2);
-      z2_err_[i] += pow (pow(store_dz_[m][i],2) - z2_mu_[i] ,2);
       r2_err_[i] += pow (store_dr2_[m][i] - r2_mu_[i] ,2);
     }
-    x2_err_[i] = sqrt( x2_err_[i] * tmp);
-    y2_err_[i] = sqrt( y2_err_[i] * tmp);
-    z2_err_[i] = sqrt( z2_err_[i] * tmp);
     r2_err_[i] = sqrt( r2_err_[i] * tmp);
   }    //for E = 1 --> inf due to tmp!
 }
@@ -527,19 +488,13 @@ void Save::computeDistribution(std::string fileName, int noBins){
     int samplingTime = noSamplingTimes_ -1; //pick sampling time
 
     vectorD_t tempVectorR2(noEnsembles_, 0);
-    vectorD_t tempVectorX2(noEnsembles_, 0);
-    vectorD_t tempVectorY2(noEnsembles_, 0);
 
     for(int i = 0; i < noEnsembles_; i++){
       //(I don't know of a better way to copy the trajectories)
       tempVectorR2[i] = store_dr2_[i][samplingTime];
-      tempVectorX2[i] = pow(store_dx_[i][samplingTime], 2);
-      tempVectorY2[i] = pow(store_dy_[i][samplingTime], 2);
     }
 
     Histogram r2(tempVectorR2, noBins, fileName + "_histogram");
-    Histogram x2(tempVectorX2, noBins, fileName + "_histogramX2");
-    Histogram y2(tempVectorY2, noBins, fileName + "_histogramY2");
 
     //Also print the cumulative distribution for r^2
     r2.computeCumulative(fileName + "_cumulative");
@@ -1128,7 +1083,8 @@ void Save::computeHmatrix(const matrixD_t& trajectories, matrixD_t& matrix){
 }
 
 
-void Save::computeHmatrix2(matrixD_t& matrix, bool isMeanZero){
+//void Save::computeHmatrix2(matrixD_t& matrix, bool isMeanZero){
+void Save::computeHmatrix2(matrixD_t& matrix){
 
   matrixD_t e_x(noSamplingTimes_, vectorD_t(noSamplingTimes_, 0));
   matrixD_t e_y(noSamplingTimes_, vectorD_t(noSamplingTimes_, 0));
@@ -1137,9 +1093,10 @@ void Save::computeHmatrix2(matrixD_t& matrix, bool isMeanZero){
   std::cout << "\033[1m Computing H-matrix method 2 (each dim. separately): \033[0m"
             << std::endl;
 
-  computeVariance(store_dx_, e_x, isMeanZero);
-  computeVariance(store_dy_, e_y, isMeanZero);
-  computeVariance(store_dz_, e_z, isMeanZero);
+  throw std::string("Since the removal of dx,dy,dz, this is no longer suppreted!");
+  // computeVariance(store_dx_, e_x, isMeanZero);
+  // computeVariance(store_dy_, e_y, isMeanZero);
+  // computeVariance(store_dz_, e_z, isMeanZero);
 
   double invM = 1.0 / noEnsembles_;
 # pragma omp parallel for default(shared)
@@ -1217,9 +1174,10 @@ void Save::computeHmatrix3(matrixD_t& matrix, std::string filename,
   matrixD_t B_x(noSamplingTimes_, vectorD_t(noSamplingTimes_, 0));
   matrixD_t B_y(noSamplingTimes_, vectorD_t(noSamplingTimes_, 0));
   matrixD_t B_z(noSamplingTimes_, vectorD_t(noSamplingTimes_, 0));
-  computeBmatrix(store_dx_, B_x, isAverageZero);
-  computeBmatrix(store_dy_, B_y, isAverageZero);
-  computeBmatrix(store_dz_, B_z, isAverageZero);  //no need for this one if not 3D.
+  throw std::string("Since the removal of dx,dy,dz, this is no longer suppreted!");
+  // computeBmatrix(store_dx_, B_x, isAverageZero);
+  // computeBmatrix(store_dy_, B_y, isAverageZero);
+  // computeBmatrix(store_dz_, B_z, isAverageZero);  //no need for this one if not 3D.
 
   printHmatrix(B_x, filename + "_B_x");
 

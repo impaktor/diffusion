@@ -180,8 +180,7 @@ public:
   void move(void);                         //pick a particle & direction based on jump-rate
 
   unsigned int getDirections(void) const;
-  void getDisplacement(vector<int>&,vector<int>&,
-                       vector<int>&, vector<double>&) const;
+  void getDisplacement(vector<double>&) const;
   void setSamplingTimes(const vector<double>&, waitingtime);
   void setInteraction(float);             //determine if we use the interaction-algorithm
   void setParticles(const vector<Particle>&); //add particles to lattice
