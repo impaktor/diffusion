@@ -29,7 +29,7 @@ public:
   //name "fileName" with structure:
   // [time] [MSD] [MSD_error] [correlation] [Z=H^(-1)*t]
   //plus "head" which is just information about simulation parameters.
-  void save(std::string fileName, std::string head);
+  void save(std::string fileName, std::string head, bool printCov);
 
   // dump raw trajectories squared to files, set by output -w
   void dump(std::string fileName, std::string head);
@@ -76,13 +76,6 @@ private:
   //Switch between the two stdErr-functions above.
   bool isLowMem_;
 
-  // print as fourth column to our output:
-  vectorD_t pearson_coefficient_;
-
-  //Z is fifth column, where Z fulfills H * Z = t, H := correlation
-  //matrix. This way we don't need to output H to file.
-  vectorD_t z_correlation_;
-
   //save position for each ensemble and store them all
   matrixD_t store_dr2_;
 
@@ -110,9 +103,8 @@ private:
                         double &sigma, double &sigmaBad);
   void investigateMuConvergeance(int, std::string, bool);
 
-  //generates fourth and fifth column to print.
-  void computeZ(std::string);
-  void computePearsonCoefficient();
+  //generates more columns to print.
+  void computePearsonCoefficient(vectorD_t &pearson) const;
 
   void computeHmatrix(const matrixD_t&, matrixD_t&);
   //void computeHmatrix2(matrixD_t&, bool);
@@ -135,10 +127,6 @@ private:
 
   inline void computeError(const matrixD_t& store, const vectorD_t& msd,
                            vectorD_t& sigma);
-
-
-  void printMSD(std::string, std::string);
-
 
   //used by bootknife, among other
   template<typename T>

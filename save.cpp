@@ -60,10 +60,6 @@ Save::Save(vectorD_t samplingTime,
   //use the memory conserving function
   isLowMem_ = lowMem;
 
-  //These will be our 4th and 5th column in the main output file.
-  pearson_coefficient_.assign(noSamplingTimes_, 0);
-  z_correlation_.assign(noSamplingTimes_, 0);
-
   //initiate the vectors for the summation in store()
   //only needed if we use the memory-conserving algorithm
   if(isLowMem_){
@@ -79,7 +75,7 @@ Save::Save(vectorD_t samplingTime,
 }
 
 
-void Save::computePearsonCoefficient(){
+void Save::computePearsonCoefficient(vectorD_t &pearson_coefficient) const{
   //This function calculates the Pearson coefficients (see Numerical
   //recipes ch 14), to get the correlation between two sampling points
   //since if the tagged particle jumps once/sec sampling the system
@@ -95,6 +91,9 @@ void Save::computePearsonCoefficient(){
   if(r2_mu_.empty())          //need data to work on
     throw std::string("Must compute MSD first! (ie. r2_mu_)");
 
+  //These will be our 4th column in the main output file.
+  pearson_coefficient.assign(noSamplingTimes_, 0);
+
   //compute the correlation between two points, i, j, for i = j+1
   vectorD_t h(noSamplingTimes_,0);
 
@@ -109,7 +108,7 @@ void Save::computePearsonCoefficient(){
   // sigma_r = r2_err_ * sqrt(ensembles);
   for(int i = 1; i < noSamplingTimes_; i++){
     if(r2_err_[i-1] != 0) //zero error at time=0, avoid division by 0.
-      pearson_coefficient_[i] = (double) h[i] /
+      pearson_coefficient[i] = (double) h[i] /
         (r2_err_[i] * r2_err_[i-1] * noEnsembles_);
   }
 }
@@ -153,36 +152,6 @@ void computeZvector(const Save::matrixD_t &H,
   //Convert NR vector to std::vector
   for(int i = 0; i < N; i++)
     Z[i] = z[i];
-}
-
-
-void Save::computeZ(std::string filename){
-  //Compute H*z=t, and save z to column in out file
-
-  //compute entire matrix, to check the correlation between every
-  //value
-  matrixD_t H;
-
-  // computeHmatrix3(H, filename, true, true);
-  // printHmatrix(H, filename + "_matrix3c");
-
-  // computeHmatrix3(H, filename, false, false);
-  // printHmatrix(H, filename + "_matrix3b");
-
-  // computeHmatrix3(H, filename, true, false);
-  // printHmatrix(H, filename + "_matrix3");
-
-  // computeHmatrix2(H, false);
-  // printHmatrix(H, filename + "_matrix2b");
-
-  // computeHmatrix2(H, true);
-  // printHmatrix(H, filename + "_matrix2");
-
-  //TODO: don't use if POW waiting time / CTRW
-  computeHmatrix(store_dr2_, H);
-  printHmatrix(H, filename + "_matrix1");
-
-  computeZvector(H, samplingTime_, z_correlation_);
 }
 
 
@@ -232,7 +201,7 @@ void Save::store(const vectorD_t& dr){
 }
 
 
-void Save::save(std::string name, std::string head){
+void Save::save(std::string name, std::string head, bool printCov){
   //calculates the MSD from the stored positions of the tracer, &
   //prints to file.
 
@@ -251,11 +220,61 @@ void Save::save(std::string name, std::string head){
     //must come after x2_mu_...r2_mu_ have been computed.
     computeStdErr();
 
-    computePearsonCoefficient();  //4th column (defaults to zeroes)
-    computeZ(name);               //5th column (defaults to zeroes)
+    //4th column (defaults to zeroes)
+    vectorD_t pearson_coefficient(noSamplingTimes_, 0);
+    computePearsonCoefficient(pearson_coefficient);
 
-    printMSD(head, name); //print main results
+    //Z is fifth column, where Z fulfills H * Z = t, H := correlation
+    //matrix. This way we don't need to output H to file.
+    vectorD_t z_correlation(noSamplingTimes_, 0);
 
+    //Compute H*z=t, and save z to column in out file
+    if (printCov){
+
+      //compute entire matrix, to check the correlation between every
+      //value
+      matrixD_t H;
+
+      // computeHmatrix3(H, filename, true, true);
+      // printHmatrix(H, filename + "_matrix3c");
+
+      // computeHmatrix3(H, filename, false, false);
+      // printHmatrix(H, filename + "_matrix3b");
+
+      // computeHmatrix3(H, filename, true, false);
+      // printHmatrix(H, filename + "_matrix3");
+
+      // computeHmatrix2(H, false);
+      // printHmatrix(H, filename + "_matrix2b");
+
+      // computeHmatrix2(H, true);
+      // printHmatrix(H, filename + "_matrix2");
+
+      //TODO: don't use if POW waiting time / CTRW
+      computeHmatrix(store_dr2_, H);
+      printHmatrix(H, name + "_matrix1");
+
+      computeZvector(H, samplingTime_, z_correlation);
+    }
+
+
+    { // Print MSD
+      std::ofstream primary(name.c_str());
+      primary   << head;
+      std::cout << head;
+
+      std::string fifth_column = printCov ? "\t z" : "";
+      primary << "# t \t MSD \t err \t pearson" + fifth_column << std::endl;
+
+      for(int i = 0; i < noSamplingTimes_; i++){
+        primary << samplingTime_[i] << "\t" << r2_mu_[i] << "\t" << r2_err_[i]
+                << "\t" << pearson_coefficient[i];
+        if(printCov)
+          primary << "\t" << z_correlation[i];
+        primary << std::endl;
+      }
+      primary.close();
+    }
 
     if(BIAS_TEST_ITER != 0){
       //For testing convergeance of slope as func. of samplingpoints.
@@ -313,24 +332,6 @@ void Save::printSlopeJackknifeShrinkage(std::string filename, int jackgroups){
 //     computeShrinkage(store_dr2_, H_star);
 //     printHmatrix(H_star, filename + "_shrinkage_matrix");
 // }
-
-
-
-void Save::printMSD(std::string head, std::string name){
-
-  std::ofstream primary(name.c_str());
-  primary   << head;
-  std::cout << head;
-
-  primary << "# t \t MSD \t err \t pearson \t z" << std::endl;
-
-  for(int i = 0; i < noSamplingTimes_; i++){
-    primary << samplingTime_[i] << "\t" << r2_mu_[i] << "\t" << r2_err_[i]
-            << "\t" << pearson_coefficient_[i] << "\t" << z_correlation_[i]
-            << std::endl;
-  }
-  primary.close();
-}
 
 
 void Save::computeStdErr(void){

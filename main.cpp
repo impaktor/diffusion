@@ -114,6 +114,9 @@ int main(int argc, char* argv[]){
     tmpValue = ini.GetValue("save", "print_histogram", NULL);
     bool printHistogram = aux::convertToBool(tmpValue, "print_histogram");
 
+    tmpValue = ini.GetValue("save", "print_cov", NULL);
+    bool printCov = aux::convertToBool(tmpValue, "print_cov");
+
     tmpValue = ini.GetValue("save", "noHistogramBins", NULL);
     int noHistogramBins = atoi(tmpValue);
 
@@ -290,7 +293,7 @@ int main(int argc, char* argv[]){
 
     if(def.method != 'd')
       //calculate standard deviation, error-bars, and save to file
-      save.save(def.outputFileName, head);
+      save.save(def.outputFileName, head, printCov);
     else
       // dump raw trajectories (non-mean) to file. Do rest in script.
       save.dump(def.outputFileName, head);
