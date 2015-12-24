@@ -69,9 +69,7 @@ public:
     int dy = true_y - center_.y;
     int dz = true_z - center_.z;
 
-    return 0.5*sqrt(pow(  dx + dy - dz, 2) +
-                    pow(  dx - dy + dz, 2) +
-                    pow(- dx + dy + dz, 2));
+    return sqrt(3)/3.0 * sqrt(pow(dx,2) + pow(dy,2) + pow(dz,2));
   }
 
   void moveAndBoundaryCheck(size_t n, size_t R);
@@ -95,9 +93,7 @@ public:
     int dy = true_y - center_.y;
     int dz = true_z - center_.z;
 
-    return 0.5*sqrt(pow(dx + dy, 2) +
-                    pow(dx + dz, 2) +
-                    pow(dy + dz, 2));
+    return sqrt(2)/2.0 * sqrt(pow(dx,2) + pow(dy,2) + pow(dz,2));
   }
 
   void moveAndBoundaryCheck(size_t n, size_t R);
