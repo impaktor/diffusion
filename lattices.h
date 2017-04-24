@@ -6,6 +6,25 @@
 #include "baselattice.h"   // the basic methods for a lattice
 
 
+// For moving 1 particle in 1 D, we can do it _a_lot_ faster and simpler
+class Special: public BaseLattice{
+public:
+
+  Special(int x, double seed, bool boundaryFix)
+    //initiate the class by calling the base class
+    : BaseLattice(x,1,1, 1, seed, boundaryFix)
+  {
+    directions_ = 2 ;
+  }
+
+  double distance(){
+    double dx = true_x - center_.x;
+    return sqrt(pow(dx,2));
+  }
+
+  void moveAndBoundaryCheck(size_t n, size_t R);
+};
+
 class Square: public BaseLattice{
 public:
 

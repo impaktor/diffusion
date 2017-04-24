@@ -703,3 +703,67 @@ void FCC::moveAndBoundaryCheck(size_t n, size_t R){
     }
   }
 }
+
+
+void Special::moveAndBoundaryCheck(size_t n, size_t R){
+  if (n > noParticles_ -1)
+    throw std::string("Invalid particle label, n=" + tostring(n) +
+                      ", must fulfill 0 <= n < N");
+
+  if (R > directions_ -1)
+    throw std::string("There is a maximum of " + tostring(directions_) +
+                      " positive directions to move in");
+
+  if (isTestOn_) std::cout << "Moving particle " << n << std::endl;
+
+  // if particle is outside and fix boundary, we know we should move it back
+  bool isOutside = false;
+
+  //Store in case we want to restore the previous configuration
+  Particle old = pos_[n];
+
+    // Move particle n on the lattice:
+  switch(R){
+  case 0:
+    pos_[n].x = pos_[n].x +1;
+
+    if(pos_[n].x == latticeX_ +1){
+      isOutside = true;
+      if(!isBoundaryFix_) pos_[n].x = 1;
+    }
+    break;
+  case 1:
+    pos_[n].x = pos_[n].x -1;
+
+    if(pos_[n].x == 0){
+      isOutside = true;
+      if(!isBoundaryFix_) pos_[n].x = latticeX_;
+    }
+    break;
+  default:
+    throw std::string("move in direction" + tostring(R) + "not implemented");
+  }
+
+  if(isOutside && isBoundaryFix_)
+    pos_[n] = old;
+
+  //check that the new site is vacant if not, move the particle
+  //back. (done by the vacancyCheck...)
+  bool collided = vacancyCheck(n,old);
+
+  //If n is tagged particle, then also move it in its second,
+  //"infinite" coordinate system, - if it didn't collied with any
+  //particle on our lattice above.
+  if (n == 0 && !collided && !(isBoundaryFix_ && isOutside)){
+    switch(R) {
+    case 0:
+      true_x++;
+      break;
+    case 1:
+      true_x--;
+      break;
+    default:
+      throw std::string("move in direction" + tostring(R) + "not implemented");
+    }
+  }
+}
